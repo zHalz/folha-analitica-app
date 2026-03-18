@@ -2,25 +2,66 @@ import streamlit as st
 import pdfplumber
 import pandas as pd
 import re
-from tqdm import tqdm
 import tempfile
+from datetime import datetime
 
 st.set_page_config(page_title="Folha Analítica", layout="centered")
 
+# -------------------------------
+# ESTILO (deixa bonito)
+# -------------------------------
+st.markdown("""
+    <style>
+        .stButton>button {
+            background-color: #0f62fe;
+            color: white;
+            border-radius: 8px;
+            height: 3em;
+            width: 100%;
+            font-size: 16px;
+        }
+        .stDownloadButton>button {
+            background-color: #24a148;
+            color: white;
+            border-radius: 8px;
+            height: 3em;
+            width: 100%;
+            font-size: 16px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# -------------------------------
+# TÍTULO
+# -------------------------------
 st.title("📄 Processador de Folha Analítica")
-st.write("Envie o PDF e baixe o Excel pronto")
+st.caption("Envie o PDF e receba o Excel pronto para importação")
 
 # -------------------------------
-# FUNÇÃO EXTRAÇÃO (SEU CÓDIGO)
+# HISTÓRICO (sessão)
 # -------------------------------
+if "historico" not in st.session_state:
+    st.session_state.historico = []
 
+# -------------------------------
+# FUNÇÃO EXTRAÇÃO COM PROGRESSO
+# -------------------------------
 def extrair_folha_analitica(pdf_path):
 
     dados = []
 
     with pdfplumber.open(pdf_path) as pdf:
 
+        total_paginas = len(pdf.pages)
+
+        progresso = st.progress(0)
+        status = st.empty()
+
         for page_num, page in enumerate(pdf.pages):
+
+            status.text(f"📄 Processando página {page_num+1} de {total_paginas}")
+
+            progresso.progress((page_num + 1) / total_paginas)
 
             texto = page.extract_text() or page.extract_text(layout=True) or page.extract_text(x_tolerance=3)
 
@@ -81,15 +122,15 @@ def extrair_folha_analitica(pdf_path):
 
                             dados.append({
                                 "pagina": page_num + 1,
-                                "linha_original": i + 1,
                                 "nome": nome_final,
                                 "matricula": matricula_final,
                                 "tipo": tipo,
                                 "codigo": codigo,
                                 "descricao": desc.strip(),
-                                "referencia": ref,
                                 "valor": valor
                             })
+
+        status.text("✅ Extração concluída!")
 
     df = pd.DataFrame(dados)
 
@@ -102,40 +143,39 @@ def extrair_folha_analitica(pdf_path):
 # -------------------------------
 # UPLOAD
 # -------------------------------
-
 uploaded_file = st.file_uploader("📤 Envie o PDF", type=["pdf"])
 
 if uploaded_file:
+
+    nome_arquivo = uploaded_file.name
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(uploaded_file.read())
         pdf_path = tmp.name
 
-    st.info("🔄 Processando arquivo...")
+    st.info("🔄 Iniciando processamento...")
 
     df_consolidado = extrair_folha_analitica(pdf_path)
 
     if df_consolidado.empty:
-        st.error("❌ Nenhum dado encontrado no PDF")
+        st.error("❌ Nenhum dado encontrado")
         st.stop()
 
     # -------------------------------
     # PIVOT
     # -------------------------------
-
     pivot_completa = df_consolidado.pivot_table(
         values="valor",
         index=["nome", "matricula", "tipo"],
         columns="codigo",
         aggfunc="sum",
         fill_value=0
-    ).round(2).reset_index()
+    ).reset_index()
 
     # -------------------------------
     # ANÁLISE
     # -------------------------------
-
-    mapa_codigos = {
+    mapa = {
         "455": "Assistência Médica Titular",
         "454": "Assistência Odontológica Titular",
         "458": "Coparticipação",
@@ -143,63 +183,55 @@ if uploaded_file:
         "461": "Assistência Odontológica Dependente"
     }
 
-    for col in mapa_codigos.keys():
+    for col in mapa:
         if col not in pivot_completa.columns:
             pivot_completa[col] = 0
 
-    analise_plano = pivot_completa[
-        ["nome", "matricula"] + list(mapa_codigos.keys())
-    ].copy().rename(columns=mapa_codigos)
+    analise = pivot_completa[
+        ["nome", "matricula"] + list(mapa.keys())
+    ].rename(columns=mapa)
 
-    analise_plano = analise_plano.groupby(
-        ["nome", "matricula"]
-    ).sum().reset_index()
+    analise = analise.groupby(["nome", "matricula"]).sum().reset_index()
 
     # -------------------------------
-    # SPLIT CORRETO
+    # SPLIT
     # -------------------------------
-
     linhas = []
 
-    for _, row in analise_plano.iterrows():
-
-        nome = row["nome"]
-        mat = row["matricula"]
+    for _, row in analise.iterrows():
 
         med_tit = row["Assistência Médica Titular"]
         odo_tit = row["Assistência Odontológica Titular"]
 
-        med_dep_total = row["Assistência Médica Dependente"]
-        odo_dep_total = row["Assistência Odontológica Dependente"]
+        med_dep = row["Assistência Médica Dependente"]
+        odo_dep = row["Assistência Odontológica Dependente"]
 
-        cop = row["Coparticipação"]
+        qtd_med = int(round(med_dep / med_tit)) if med_tit > 0 else 0
+        qtd_odo = int(round(odo_dep / odo_tit)) if odo_tit > 0 else 0
 
-        qtd_dep_med = int(round(med_dep_total / med_tit)) if med_tit > 0 else 0
-        qtd_dep_odo = int(round(odo_dep_total / odo_tit)) if odo_tit > 0 else 0
-
-        qtd_dependentes = max(qtd_dep_med, qtd_dep_odo)
+        qtd = max(qtd_med, qtd_odo)
 
         # TITULAR
         linhas.append({
-            "nome": nome,
-            "matricula": mat,
+            "nome": row["nome"],
+            "matricula": row["matricula"],
             "tipo_registro": "TITULAR",
             "dependente_id": 0,
             "vlr_medico": med_tit,
             "vlr_odonto": odo_tit,
-            "vlr_copart": cop,
-            "total": round(med_tit + odo_tit + cop, 2)
+            "vlr_copart": row["Coparticipação"],
+            "total": med_tit + odo_tit + row["Coparticipação"]
         })
 
         # DEPENDENTES
-        for i in range(qtd_dependentes):
+        for i in range(qtd):
 
-            vlr_med = med_dep_total / qtd_dep_med if i < qtd_dep_med and qtd_dep_med > 0 else 0
-            vlr_odo = odo_dep_total / qtd_dep_odo if i < qtd_dep_odo and qtd_dep_odo > 0 else 0
+            vlr_med = med_dep / qtd_med if i < qtd_med and qtd_med > 0 else 0
+            vlr_odo = odo_dep / qtd_odo if i < qtd_odo and qtd_odo > 0 else 0
 
             linhas.append({
-                "nome": nome,
-                "matricula": mat,
+                "nome": row["nome"],
+                "matricula": row["matricula"],
                 "tipo_registro": "DEPENDENTE",
                 "dependente_id": i + 1,
                 "vlr_medico": round(vlr_med, 2),
@@ -213,23 +245,37 @@ if uploaded_file:
     # -------------------------------
     # GERAR EXCEL
     # -------------------------------
-
     output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
 
     with pd.ExcelWriter(output.name, engine="openpyxl") as writer:
         df_consolidado.to_excel(writer, sheet_name="Detalhamento", index=False)
         pivot_completa.to_excel(writer, sheet_name="Pivot", index=False)
-        analise_plano.to_excel(writer, sheet_name="Analise", index=False)
+        analise.to_excel(writer, sheet_name="Analise", index=False)
         df_totvs.to_excel(writer, sheet_name="TOTVS", index=False)
+
+    # -------------------------------
+    # HISTÓRICO
+    # -------------------------------
+    st.session_state.historico.append({
+        "arquivo": nome_arquivo,
+        "data": datetime.now().strftime("%d/%m %H:%M"),
+        "linhas": len(df_totvs)
+    })
 
     # -------------------------------
     # DOWNLOAD
     # -------------------------------
-
     with open(output.name, "rb") as f:
-        st.success("✅ Processamento concluído!")
-        st.download_button(
-            "⬇️ Baixar Excel",
-            f,
-            file_name="folha_processada.xlsx"
-        )
+        st.success("✅ Concluído!")
+        st.download_button("⬇️ Baixar Excel", f, file_name="folha_processada.xlsx")
+
+# -------------------------------
+# EXIBIR HISTÓRICO
+# -------------------------------
+if st.session_state.historico:
+
+    st.divider()
+    st.subheader("📊 Histórico de Processamentos")
+
+    hist_df = pd.DataFrame(st.session_state.historico)
+    st.dataframe(hist_df, use_container_width=True)
