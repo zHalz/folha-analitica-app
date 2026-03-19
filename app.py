@@ -248,10 +248,61 @@ if uploaded_file:
     output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
 
     with pd.ExcelWriter(output.name, engine="openpyxl") as writer:
-        df_consolidado.to_excel(writer, sheet_name="Detalhamento", index=False)
-        pivot_completa.to_excel(writer, sheet_name="Pivot", index=False)
-        analise.to_excel(writer, sheet_name="Analise", index=False)
-        df_totvs.to_excel(writer, sheet_name="TOTVS", index=False)
+    df_consolidado.to_excel(writer, sheet_name="Detalhamento", index=False)
+    pivot_completa.to_excel(writer, sheet_name="Pivot", index=False)
+    analise.to_excel(writer, sheet_name="Analise", index=False)
+    df_totvs.to_excel(writer, sheet_name="TOTVS", index=False)
+
+# ------------------------------------------
+# PÓS-PROCESSAMENTO EXCEL (TOTVS)
+# ------------------------------------------
+
+wb = load_workbook(output.name)
+ws = wb["TOTVS"]
+
+# Última linha REAL (coluna C = tipo_registro)
+ultima_linha = max(
+    cell.row for cell in ws["C"] if cell.value is not None
+)
+
+# Linhas finais
+linha_titular = ultima_linha + 2
+linha_dependente = ultima_linha + 3
+
+# Labels
+ws[f"D{linha_titular}"] = "TITULAR"
+ws[f"D{linha_dependente}"] = "DEPENDENTE"
+
+# Range dinâmico
+range_e = f"E2:E{ultima_linha}"
+range_f = f"F2:F{ultima_linha}"
+range_g = f"G2:G{ultima_linha}"
+range_h = f"H2:H{ultima_linha}"
+range_c = f"C2:C{ultima_linha}"
+
+# ------------------------------------------
+# TITULAR
+# ------------------------------------------
+
+ws[f"E{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_titular})+0)'
+ws[f"F{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_titular})+0)'
+ws[f"G{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_titular})+0)'
+ws[f"H{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_titular})+0)'
+
+# ------------------------------------------
+# DEPENDENTE
+# ------------------------------------------
+
+ws[f"E{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_dependente})+0)'
+ws[f"F{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_dependente})+0)'
+ws[f"G{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_dependente})+0)'
+ws[f"H{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_dependente})+0)'
+
+# Forçar recálculo no Excel
+wb.calculation.fullCalcOnLoad = True
+
+# Salvar
+wb.save(output.name)
 
     # -------------------------------
     # HISTÓRICO
