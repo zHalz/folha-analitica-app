@@ -428,7 +428,7 @@ with col_process:
 
     st.markdown('<div class="section-title"><h2>💌 Processamento dos PDFs</h2></div>', unsafe_allow_html=True)
 
-        uploaded_files = st.file_uploader(
+    uploaded_files = st.file_uploader(
         "Arraste seus PDFs aqui",
         type=["pdf"],
         accept_multiple_files=True,
