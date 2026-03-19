@@ -10,52 +10,83 @@ from openpyxl import load_workbook
 st.set_page_config(page_title="Folha Analítica", layout="centered")
 
 # -------------------------------
-# ESTILO FINAL (FIX VISUAL)
+# CSS ESTILO LOVEYUU 💖
 # -------------------------------
 st.markdown("""
 <style>
-    .block-container {
-        padding-top: 2rem;
-        max-width: 700px;
-    }
 
-    /* FIX UPLOADER */
-    section[data-testid="stFileUploader"] {
-        background-color: #1e1e1e;
-        padding: 1.5rem;
-        border-radius: 12px;
-        border: 1px solid #333;
-    }
+.block-container {
+    max-width: 700px;
+    margin: auto;
+    padding-top: 3rem;
+    text-align: center;
+}
 
-    section[data-testid="stFileUploader"] * {
-        color: white !important;
-    }
+/* HERO */
+.hero h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+}
+.hero p {
+    color: #888;
+    font-size: 1rem;
+}
 
-    .stButton>button {
-        background: #0f62fe;
-        color: white;
-        border-radius: 8px;
-        height: 2.5em;
-        font-weight: 600;
-        border: none;
-    }
+/* UPLOAD */
+.upload-box {
+    border: 2px dashed #ddd;
+    border-radius: 16px;
+    padding: 2rem;
+    background-color: #fafafa;
+    margin-top: 1rem;
+}
 
-    .stDownloadButton>button {
-        background: #24a148;
-        color: white;
-        border-radius: 8px;
-        height: 2.5em;
-        font-weight: 600;
-        border: none;
-    }
+/* REMOVE LABEL */
+[data-testid="stFileUploader"] label {
+    display: none;
+}
+
+/* BOTÕES */
+.stButton>button {
+    background: linear-gradient(90deg, #ff4d6d, #ff758f);
+    color: white;
+    border-radius: 12px;
+    height: 2.8em;
+    font-weight: 600;
+    border: none;
+}
+
+.stDownloadButton>button {
+    background: #111;
+    color: white;
+    border-radius: 12px;
+    height: 2.8em;
+    font-weight: 600;
+}
+
+/* FILE ITEM */
+.file-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f5f5f5;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    margin-top: 0.5rem;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# TÍTULO ❤️
+# HERO 💖
 # -------------------------------
-st.title("📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)")
-st.caption("Mor, envia aqui que eu resolvo pra você rapidinho 😘")
+st.markdown("""
+<div class="hero">
+    <h1>📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)</h1>
+    <p>Mor, envia aqui que eu resolvo pra você rapidinho 😘</p>
+</div>
+""", unsafe_allow_html=True)
 
 # -------------------------------
 # SESSION STATE
@@ -289,23 +320,31 @@ def processar_pdf_cache(file_bytes):
 # -------------------------------
 # UPLOAD
 # -------------------------------
+st.markdown('<div class="upload-box">', unsafe_allow_html=True)
+
 uploaded_files = st.file_uploader(
-    "💌 Arrasta aqui os PDFs, amor",
+    "upload",
     type=["pdf"],
-    accept_multiple_files=True
+    accept_multiple_files=True,
+    label_visibility="collapsed"
 )
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------
 # UI
 # -------------------------------
 if uploaded_files:
 
+    st.markdown("### 💖 Seus arquivos")
+
     for file in uploaded_files:
 
-        col1, col2 = st.columns([4,1])
+        col1, col2, col3 = st.columns([4,1,1])
 
         col1.write(f"📄 {file.name}")
-        processar = col2.button("🚀", key=file.name)
+
+        processar = col2.button("Processar", key=file.name)
 
         if processar:
             resultado, df_totvs = processar_pdf_cache(file.getvalue())
@@ -321,8 +360,8 @@ if uploaded_files:
             st.success("Prontinho, meu amor 💚")
 
         if file.name in st.session_state.arquivos_processados:
-            st.download_button(
-                "⬇️ Baixar",
+            col3.download_button(
+                "Baixar",
                 st.session_state.arquivos_processados[file.name],
                 file_name=f"{file.name.replace('.pdf','')}.xlsx"
             )
