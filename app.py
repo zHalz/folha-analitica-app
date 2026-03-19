@@ -244,18 +244,8 @@ def processar_pdf(file):
     linha_fim = ultima
 
     for col in ["E", "F", "G", "H"]:
-        ws[f"{col}{linha_tit}"] = (
-            f'=SOMARPRODUTO('
-            f'SUBTOTAL(9;DESLOC({col}{linha_inicio};LIN({col}{linha_inicio}:{col}{linha_fim})-LIN({col}{linha_inicio});0));'
-            f'($C${linha_inicio}:$C${linha_fim}=$D${linha_tit})+0)'
-        )
-
-    for col in ["E", "F", "G", "H"]:
-        ws[f"{col}{linha_dep}"] = (
-            f'=SOMARPRODUTO('
-            f'SUBTOTAL(9;DESLOC({col}{linha_inicio};LIN({col}{linha_inicio}:{col}{linha_fim})-LIN({col}{linha_inicio});0));'
-            f'($C${linha_inicio}:$C${linha_fim}=$D${linha_dep})+0)'
-        )
+        ws[f"{col}{linha_tit}"] = f'=SOMASE(C{linha_inicio}:C{linha_fim};"TITULAR";{col}{linha_inicio}:{col}{linha_fim})'
+        ws[f"{col}{linha_dep}"] = f'=SOMASE(C{linha_inicio}:C{linha_fim};"DEPENDENTE";{col}{linha_inicio}:{col}{linha_fim})'
 
     final = BytesIO()
     wb.save(final)
