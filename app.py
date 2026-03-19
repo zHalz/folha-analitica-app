@@ -10,31 +10,43 @@ from openpyxl import load_workbook
 st.set_page_config(page_title="Folha Analítica", layout="centered")
 
 # -------------------------------
-# ESTILO
+# ESTILO PREMIUM
 # -------------------------------
 st.markdown("""
-    <style>
-        .stButton>button {
-            background-color: #0f62fe;
-            color: white;
-            border-radius: 8px;
-            height: 3em;
-            width: 100%;
-            font-size: 16px;
-        }
-        .stDownloadButton>button {
-            background-color: #24a148;
-            color: white;
-            border-radius: 8px;
-            height: 3em;
-            width: 100%;
-            font-size: 16px;
-        }
-    </style>
+<style>
+    .block-container {
+        padding-top: 2rem;
+    }
+
+    .stButton>button {
+        background: linear-gradient(90deg, #0f62fe, #4589ff);
+        color: white;
+        border-radius: 10px;
+        height: 3em;
+        font-weight: 600;
+        border: none;
+    }
+
+    .stDownloadButton>button {
+        background: linear-gradient(90deg, #24a148, #42be65);
+        color: white;
+        border-radius: 10px;
+        height: 3em;
+        font-weight: 600;
+        border: none;
+    }
+
+    .card {
+        padding: 1rem;
+        border-radius: 12px;
+        background-color: #f8f9fa;
+        margin-bottom: 1rem;
+    }
+</style>
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# TÍTULO
+# TÍTULO (MANTIDO ❤️)
 # -------------------------------
 st.title("📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)")
 st.caption("Mor, envie um ou mais PDFs e baixe o Excel pronto")
@@ -66,7 +78,7 @@ def extrair_folha_analitica(pdf_path):
             status.text(f"📄 Página {page_num+1} de {total_paginas}")
             progresso.progress((page_num + 1) / total_paginas)
 
-            texto = page.extract_text() or page.extract_text(layout=True) or page.extract_text(x_tolerance=3)
+            texto = page.extract_text() or page.extract_text(layout=True)
 
             if not texto:
                 continue
@@ -110,7 +122,6 @@ def extrair_folha_analitica(pdf_path):
                         if evento_match:
 
                             codigo, desc, ref, valor = evento_match.groups()
-
                             tipo = "PROVENTO" if idx == 0 else "DESCONTO"
 
                             valor = valor.replace(".", "").replace(",", ".")
@@ -140,7 +151,7 @@ def extrair_folha_analitica(pdf_path):
     return df
 
 # -------------------------------
-# PROCESSAMENTO
+# PROCESSAMENTO PRINCIPAL
 # -------------------------------
 def processar_pdf(file):
 
@@ -181,13 +192,11 @@ def processar_pdf(file):
 
         med_tit = row["Assistência Médica Titular"]
         odo_tit = row["Assistência Odontológica Titular"]
-
         med_dep = row["Assistência Médica Dependente"]
         odo_dep = row["Assistência Odontológica Dependente"]
 
         qtd_med = int(round(med_dep / med_tit)) if med_tit > 0 else 0
         qtd_odo = int(round(odo_dep / odo_tit)) if odo_tit > 0 else 0
-
         qtd = max(qtd_med, qtd_odo)
 
         linhas.append({
@@ -234,29 +243,8 @@ def processar_pdf(file):
 
     ultima_linha = ws.max_row
 
-    linha_titular = ultima_linha + 2
-    linha_dependente = ultima_linha + 3
-
-    ws[f"D{linha_titular}"] = "TITULAR"
-    ws[f"D{linha_dependente}"] = "DEPENDENTE"
-
-    range_e = f"E2:E{ultima_linha}"
-    range_f = f"F2:F{ultima_linha}"
-    range_g = f"G2:G{ultima_linha}"
-    range_h = f"H2:H{ultima_linha}"
-    range_c = f"C2:C{ultima_linha}"
-
-    # TITULAR
-    ws[f"E{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_titular})+0)'
-    ws[f"F{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_titular})+0)'
-    ws[f"G{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_titular})+0)'
-    ws[f"H{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_titular})+0)'
-
-    # DEPENDENTE
-    ws[f"E{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_dependente})+0)'
-    ws[f"F{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_dependente})+0)'
-    ws[f"G{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_dependente})+0)'
-    ws[f"H{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_dependente})+0)'
+    ws[f"D{ultima_linha+2}"] = "TITULAR"
+    ws[f"D{ultima_linha+3}"] = "DEPENDENTE"
 
     final = BytesIO()
     wb.save(final)
@@ -265,7 +253,14 @@ def processar_pdf(file):
     return final, df_totvs
 
 # -------------------------------
-# UPLOAD MULTIPLO
+# CACHE (ANTI REPROCESSAMENTO)
+# -------------------------------
+@st.cache_data(show_spinner=False)
+def processar_pdf_cache(file_bytes, file_name):
+    return processar_pdf(BytesIO(file_bytes))
+
+# -------------------------------
+# UPLOAD
 # -------------------------------
 uploaded_files = st.file_uploader(
     "📤 Envie um ou mais PDFs",
@@ -273,16 +268,27 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
+# -------------------------------
+# PROCESSAMENTO UI
+# -------------------------------
 if uploaded_files:
 
     for file in uploaded_files:
 
-        st.divider()
-        st.subheader(f"📄 {file.name}")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        if st.button(f"🚀 Processar {file.name}"):
+        col1, col2 = st.columns([3,1])
 
-            resultado, df_totvs = processar_pdf(file)
+        with col1:
+            st.subheader(f"📄 {file.name}")
+
+        with col2:
+            processar = st.button("🚀", key=file.name)
+
+        if processar:
+
+            with st.spinner("Processando com carinho pra você 💙"):
+                resultado, df_totvs = processar_pdf_cache(file.getvalue(), file.name)
 
             st.session_state.arquivos_processados[file.name] = resultado
 
@@ -292,13 +298,20 @@ if uploaded_files:
                 "linhas": len(df_totvs)
             })
 
+            st.success("Prontinho, meu amor! 💚")
+
+            with st.expander("👀 Visualizar dados"):
+                st.dataframe(df_totvs.head(50), use_container_width=True)
+
         if file.name in st.session_state.arquivos_processados:
 
             st.download_button(
-                f"⬇️ Baixar {file.name}",
+                "⬇️ Baixar Excel",
                 st.session_state.arquivos_processados[file.name],
                 file_name=f"{file.name.replace('.pdf','')}.xlsx"
             )
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------
 # HISTÓRICO
@@ -306,4 +319,12 @@ if uploaded_files:
 if st.session_state.historico:
     st.divider()
     st.subheader("📊 Histórico")
-    st.dataframe(pd.DataFrame(st.session_state.historico), use_container_width=True)
+
+    df_hist = pd.DataFrame(st.session_state.historico)
+
+    col1, col2 = st.columns(2)
+
+    col1.metric("Arquivos processados", len(df_hist))
+    col2.metric("Total de linhas", df_hist["linhas"].sum())
+
+    st.dataframe(df_hist, use_container_width=True)
