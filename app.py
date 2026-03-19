@@ -115,9 +115,9 @@ if "arquivos_processados" not in st.session_state:
     st.session_state.arquivos_processados = {}
 
 # -------------------------------
-# EXTRAÇÃO (SEM tqdm, já que é Streamlit)
+# EXTRAÇÃO (COM BARRA DE PROGRESSO) 💖
 # -------------------------------
-def extrair_folha_analitica(pdf_path):
+def extrair_folha_analitica(pdf_path, status_container, progress_bar=None):
 
     dados = []
 
@@ -126,6 +126,14 @@ def extrair_folha_analitica(pdf_path):
         total_paginas = len(pdf.pages)
 
         for page_num, page in enumerate(pdf.pages):
+
+            # Atualiza status e barra de progresso (se foram passados)
+            if status_container is not None:
+                status_container.markdown(
+                    f"**🔄 Página {page_num + 1} de {total_paginas} ({((page_num + 1) / total_paginas) * 100:.1f}% concluído)**"
+                )
+            if progress_bar is not None:
+                progress_bar.progress((page_num + 1) / total_paginas)
 
             texto = page.extract_text() or page.extract_text(layout=True) or page.extract_text(x_tolerance=3)
 
@@ -209,7 +217,6 @@ def extrair_folha_analitica(pdf_path):
     )
 
     return df
-
 
 # -------------------------------
 # PIVOT E ANÁLISE DE PLANO DE SAÚDE
@@ -380,16 +387,18 @@ def exportar_para_excel_completo(df_consolidado, pivot_completa, analise_plano, 
 
 
 # -------------------------------
-# PROCESSAMENTO COMPLETO DE UM ARQUIVO
+# PROCESSAMENTO COMPLETO DE UM ARQUIVO (COM PROGRESSO) 💖
 # -------------------------------
-def processar_pdf(file):
+def processar_pdf(file, status_container, progress_bar):
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(file.read())
         pdf_path = tmp.name
 
-    # 1. extração
-    df_consolidado = extrair_folha_analitica(pdf_path)
+    # 1. extração com progresso
+    df_consolidado = extrair_folha_analitica(
+        pdf_path, status_container=status_container, progress_bar=progress_bar
+    )
 
     if df_consolidado.empty:
         return None, None
@@ -415,14 +424,13 @@ def processar_pdf(file):
 
     return excel_final, resumo
 
-
 # -------------------------------
 # LAYOUT 2 COLUNAS: Processamento | Histórico 💖
 # -------------------------------
 col_process, col_hist = st.columns([2, 1], gap="medium")
 
 # -------------------------------
-# COLUNA ESQUERDA – PROCESSAMENTO
+# COLUNA ESQUERDA – PROCESSAMENTO COM PROGRESSO 💖
 # -------------------------------
 with col_process:
 
@@ -444,11 +452,14 @@ with col_process:
                 # já processado: botão desabilitado + download
                 aux_cols[0].markdown(f"✅ {file.name}")
                 aux_cols[1].button("Processar", key=file.name, disabled=True)
+
+                # botão de download (já conectado ao BytesIO)
                 aux_cols[2].download_button(
                     "Baixar",
                     st.session_state.arquivos_processados[file.name]["file"],
                     file_name=file.name.replace(".pdf", ".xlsx"),
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"download_{file.name}"
                 )
 
                 # mostra resumo do arquivo já processado
@@ -463,18 +474,21 @@ with col_process:
                 aux_cols[0].markdown(f"📎 {file.name}")
 
                 if aux_cols[1].button("Processar", key=file.name):
-                    status_p = st.empty()
-                    status_p.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+                    status_container = st.empty()
+                    progress_bar = st.progress(0)
+
+                    status_container.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
                     try:
-                        excel_final, resumo = processar_pdf(file)
+                        excel_final, resumo = processar_pdf(file, status_container, progress_bar)
 
                         if excel_final is None:
-                            status_p.error("⚠️ Não foi possível extrair dados desse PDF.")
+                            status_container.error("⚠️ Não foi possível extrair dados desse PDF.")
                         else:
-                            status_p.success("Prontinho, meu amor 💚")
+                            progress_bar.empty()
+                            status_container.success("✅ Processamento concluído! Prontinho, meu amor 💚")
 
-                            # armazena no session_state: arquivo Excel + resumo
+                            # armazena o arquivo Excel + resumo
                             st.session_state.arquivos_processados[file.name] = {
                                 "file": excel_final,
                                 "resumo": resumo
@@ -489,8 +503,8 @@ with col_process:
                             })
 
                     except Exception as e:
-                        status_p.error(f"❌ Erro ao processar: {str(e)}")
-
+                        progress_bar.empty()
+                        status_container.error(f"❌ Erro ao processar: {str(e)}")
 
 # -------------------------------
 # COLUNA DIREITA – HISTÓRICO
