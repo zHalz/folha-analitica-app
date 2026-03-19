@@ -7,20 +7,20 @@ from datetime import datetime
 from io import BytesIO
 from openpyxl import load_workbook
 
-st.set_page_config(page_title="Folha Analítica", layout="centered")
+st.set_page_config(page_title="Folha Analítica", layout="wide")
 
 # -------------------------------
-# CSS PREMIUM DARK 💖
+# CSS MODERNO DARK E FLUIDO 💖
 # -------------------------------
 st.markdown("""
 <style>
 :root {
     --bg-dark: #0e1117;
-    --card-dark: #161b22;
-    --border-dark: #222;
-    --accent-grad-start: #ff4d6d;
-    --accent-grad-end: #ff758f;
-    --light-text: #aaa;
+    --surface-dark: #161b22;
+    --secondary-text: #bbb;
+    --accent-start: #ff4d6d;
+    --accent-end: #ff758f;
+    --success: #24a148;
 }
 
 body {
@@ -29,78 +29,83 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+/* Espaçamento e altura mínima */
 .block-container {
-    max-width: 750px;
-    margin: auto;
-    padding-top: 2rem;
-    padding-bottom: 3rem;
+    min-height: 100vh;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+/* TÍTULO PRINCIPAL */
+h1, h2, h3 {
+    color: white;
 }
 
 /* HERO */
 .hero {
     text-align: center;
-    margin-bottom: 2rem;
-}
-.hero h1 {
-    color: white;
-    font-weight: 600;
-    font-size: 1.8rem;
-}
-.hero p {
-    color: var(--light-text);
-    font-size: 1.1rem;
-}
-
-/* CARDS */
-.card {
-    background: var(--card-dark);
-    padding: 1.2rem;
-    border-radius: 14px;
     margin-bottom: 1.5rem;
-    border: 1px solid var(--border-dark);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* UPLOADER */
-[data-testid="stFileUploader"] {
-    border: none !important;
-    background: transparent !important;
+.hero h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.hero p {
+    color: var(--secondary-text);
+    font-size: 1.1rem;
 }
 
 /* BOTÕES */
 .stButton>button {
-    background: linear-gradient(90deg, var(--accent-grad-start), var(--accent-grad-end));
+    background: linear-gradient(90deg, var(--accent-start), var(--accent-end));
     color: white;
-    border-radius: 10px;
+    border-radius: 8px;
     height: 2.6em;
-    width: 100%;
     border: none;
     font-weight: 500;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.stButton>button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 100, 130, 0.3);
 }
 
 .stButton>button:disabled {
-    opacity: 0.6;
+    background: linear-gradient(90deg, #88334d, #99445f);
+    opacity: 0.7;
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
+/* BOTÃO DE DOWNLOAD */
 .stDownloadButton>button {
-    background-color: #24a148 !important;
-    color: white;
-    border-radius: 10px;
-    height: 2.6em;
-    width: 100%;
-    border: none;
-}
-
-/* TEXTO */
-h2, h3, h4 {
-    color: white;
-}
-
-/* TABELA */
-.stDataFrame {
-    margin-top: 0.5rem;
+    background-color: var(--success) !important;
     border-radius: 8px;
+    height: 2.6em;
+    border: none;
+    font-weight: 500;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.stDownloadButton>button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(36, 161, 72, 0.3);
+}
+
+/* TABELA DE HISTÓRICO */
+.stDataFrame {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* ESPAÇAMENTO ENTRE SESSÕES */
+.section-title {
+    margin-top: 1rem;
+    margin-bottom: 0.8rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -328,59 +333,51 @@ def processar_pdf(file):
     return final, df_totvs
 
 # -------------------------------
-# UPLOAD CARD 💖
+# LAYOUT 2 COLUNAS: Processamento | Histórico 💖
 # -------------------------------
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.subheader("💌 Envie seus PDFs")
+col_process, col_hist = st.columns([2, 1], gap="medium")
 
-uploaded_files = st.file_uploader(
-    "Arraste aqui",
-    type=["pdf"],
-    accept_multiple_files=True
-)
+with col_process:
 
-st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><h2>💌 Processamento dos PDFs</h2></div>', unsafe_allow_html=True)
 
-# -------------------------------
-# PROCESSAMENTO DOS ARQUIVOS 💖
-# -------------------------------
-if uploaded_files:
+    uploaded_files = st.file_uploader(
+        "Arraste seus PDFs aqui",
+        type=["pdf"],
+        accept_multiple_files=True,
+        label_visibility="collapsed"
+    )
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("📄 Arquivos")
+    if uploaded_files:
+        for file in uploaded_files:
+            aux_cols = st.columns([4, 1, 1])
 
-    for file in uploaded_files:
+            if file.name in st.session_state.arquivos_processados:
+                aux_cols[0].markdown(f"✅ {file.name}")
+                aux_cols[1].button("Processar", key=file.name, disabled=True)
+                aux_cols[2].download_button(
+                    "Baixar",
+                    st.session_state.arquivos_processados[file.name],
+                    file_name=file.name.replace(".pdf", ".xlsx"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            else:
+                aux_cols[0].markdown(f"📎 {file.name}")
+                if aux_cols[1].button("Processar", key=file.name):
+                    status_p = st.empty()
+                    status_p.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
-        col1, col2, col3 = st.columns([4, 1, 1])
+                    resultado, df_totvs = processar_pdf(file)
 
-        # Marcar arquivos já processados
-        if file.name in st.session_state.arquivos_processados:
-            col1.markdown(f"✅ {file.name}")
-            col2.button("Processar", key=file.name, disabled=True)
-            col3.download_button(
-                "Baixar",
-                st.session_state.arquivos_processados[file.name],
-                file_name=file.name.replace(".pdf", ".xlsx"),
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        else:
-            col1.write(file.name)
-            if col2.button("Processar", key=file.name):
-                status_p = st.empty()
-                status_p.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+                    status_p.success("Prontinho, meu amor 💚")
 
-                resultado, df_totvs = processar_pdf(file)
+                    st.session_state.arquivos_processados[file.name] = resultado
 
-                status_p.success("Prontinho, meu amor 💚")
 
-                st.session_state.arquivos_processados[file.name] = resultado
+with col_hist:
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><h2>📋 Histórico de Processamentos</h2></div>', unsafe_allow_html=True)
 
-# -------------------------------
-# HISTÓRICO (em expander) 💖
-# -------------------------------
-with st.expander("📋 Histórico de processamentos"):
     if st.session_state.historico:
         df_hist = pd.DataFrame(st.session_state.historico)
         st.dataframe(df_hist, use_container_width=True)
