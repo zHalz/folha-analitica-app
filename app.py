@@ -4,11 +4,13 @@ import pandas as pd
 import re
 import tempfile
 from datetime import datetime
+from io import BytesIO
+from openpyxl import load_workbook
 
 st.set_page_config(page_title="Folha Analítica", layout="centered")
 
 # -------------------------------
-# ESTILO (deixa bonito)
+# ESTILO
 # -------------------------------
 st.markdown("""
     <style>
@@ -35,16 +37,16 @@ st.markdown("""
 # TÍTULO
 # -------------------------------
 st.title("📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)")
-st.caption("Mor, envie o PDF e receba o Excel pronto para importação")
+st.caption("Envie o PDF e receba o Excel pronto para o TOTVS")
 
 # -------------------------------
-# HISTÓRICO (sessão)
+# HISTÓRICO
 # -------------------------------
 if "historico" not in st.session_state:
     st.session_state.historico = []
 
 # -------------------------------
-# FUNÇÃO EXTRAÇÃO COM PROGRESSO
+# EXTRAÇÃO
 # -------------------------------
 def extrair_folha_analitica(pdf_path):
 
@@ -60,7 +62,6 @@ def extrair_folha_analitica(pdf_path):
         for page_num, page in enumerate(pdf.pages):
 
             status.text(f"📄 Processando página {page_num+1} de {total_paginas}")
-
             progresso.progress((page_num + 1) / total_paginas)
 
             texto = page.extract_text() or page.extract_text(layout=True) or page.extract_text(x_tolerance=3)
@@ -73,7 +74,7 @@ def extrair_folha_analitica(pdf_path):
             nome_atual = None
             matricula_atual = None
 
-            for i, linha in enumerate(linhas):
+            for linha in linhas:
 
                 linha = linha.strip()
                 linha = re.sub(r"\s{2,}", " ", linha)
@@ -92,9 +93,6 @@ def extrair_folha_analitica(pdf_path):
                 if "|" in linha and re.search(r"\d{3}", linha):
 
                     partes = linha.split("|")
-
-                    nome_final = nome_atual if nome_atual else "SEM_NOME"
-                    matricula_final = matricula_atual if matricula_atual else "SEM_MAT"
 
                     for idx, parte in enumerate(partes):
 
@@ -122,8 +120,8 @@ def extrair_folha_analitica(pdf_path):
 
                             dados.append({
                                 "pagina": page_num + 1,
-                                "nome": nome_final,
-                                "matricula": matricula_final,
+                                "nome": nome_atual or "SEM_NOME",
+                                "matricula": matricula_atual or "SEM_MAT",
                                 "tipo": tipo,
                                 "codigo": codigo,
                                 "descricao": desc.strip(),
@@ -147,24 +145,22 @@ uploaded_file = st.file_uploader("📤 Envie o PDF", type=["pdf"])
 
 if uploaded_file:
 
-    nome_arquivo = uploaded_file.name
-
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(uploaded_file.read())
         pdf_path = tmp.name
 
-    st.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+    st.info("🔄 Processando...")
 
-    df_consolidado = extrair_folha_analitica(pdf_path)
+    df = extrair_folha_analitica(pdf_path)
 
-    if df_consolidado.empty:
+    if df.empty:
         st.error("❌ Nenhum dado encontrado")
         st.stop()
 
     # -------------------------------
     # PIVOT
     # -------------------------------
-    pivot_completa = df_consolidado.pivot_table(
+    pivot = df.pivot_table(
         values="valor",
         index=["nome", "matricula", "tipo"],
         columns="codigo",
@@ -184,13 +180,10 @@ if uploaded_file:
     }
 
     for col in mapa:
-        if col not in pivot_completa.columns:
-            pivot_completa[col] = 0
+        if col not in pivot.columns:
+            pivot[col] = 0
 
-    analise = pivot_completa[
-        ["nome", "matricula"] + list(mapa.keys())
-    ].rename(columns=mapa)
-
+    analise = pivot[["nome", "matricula"] + list(mapa.keys())].rename(columns=mapa)
     analise = analise.groupby(["nome", "matricula"]).sum().reset_index()
 
     # -------------------------------
@@ -243,21 +236,45 @@ if uploaded_file:
     df_totvs = pd.DataFrame(linhas)
 
     # -------------------------------
-    # GERAR EXCEL
+    # EXCEL EM MEMÓRIA
     # -------------------------------
-    output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    buffer = BytesIO()
 
-    with pd.ExcelWriter(output.name, engine="openpyxl") as writer:
-        df_consolidado.to_excel(writer, sheet_name="Detalhamento", index=False)
-        pivot_completa.to_excel(writer, sheet_name="Pivot", index=False)
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name="Detalhamento", index=False)
+        pivot.to_excel(writer, sheet_name="Pivot", index=False)
         analise.to_excel(writer, sheet_name="Analise", index=False)
-        df_totvs.to_excel(writer, sheet_name="TOTVS", index=False)
+        df_totvs.to_excel(writer, sheet_name="Base_TOTVS", index=False)
+
+    buffer.seek(0)
+
+    # -------------------------------
+    # PÓS-PROCESSAMENTO TOTVS
+    # -------------------------------
+    wb = load_workbook(buffer)
+    ws = wb["Base_TOTVS"]
+
+    ultima = ws.max_row
+
+    linha_tit = ultima + 2
+    linha_dep = ultima + 3
+
+    ws[f"D{linha_tit}"] = "TITULAR"
+    ws[f"D{linha_dep}"] = "DEPENDENTE"
+
+    for col in ["E", "F", "G", "H"]:
+        ws[f"{col}{linha_tit}"] = f'=SUMIF(C:C,"TITULAR",{col}:{col})'
+        ws[f"{col}{linha_dep}"] = f'=SUMIF(C:C,"DEPENDENTE",{col}:{col})'
+
+    final = BytesIO()
+    wb.save(final)
+    final.seek(0)
 
     # -------------------------------
     # HISTÓRICO
     # -------------------------------
     st.session_state.historico.append({
-        "arquivo": nome_arquivo,
+        "arquivo": uploaded_file.name,
         "data": datetime.now().strftime("%d/%m %H:%M"),
         "linhas": len(df_totvs)
     })
@@ -265,17 +282,18 @@ if uploaded_file:
     # -------------------------------
     # DOWNLOAD
     # -------------------------------
-    with open(output.name, "rb") as f:
-        st.success("✅ Concluído!")
-        st.download_button("⬇️ Baixar Excel", f, file_name="folha_processada.xlsx")
+    st.success("✅ Pronto!")
+
+    st.download_button(
+        "⬇️ Baixar Excel",
+        final,
+        file_name="folha_processada.xlsx"
+    )
 
 # -------------------------------
-# EXIBIR HISTÓRICO
+# HISTÓRICO VISUAL
 # -------------------------------
 if st.session_state.historico:
-
     st.divider()
-    st.subheader("📊 Histórico de Processamentos")
-
-    hist_df = pd.DataFrame(st.session_state.historico)
-    st.dataframe(hist_df, use_container_width=True)
+    st.subheader("📊 Histórico")
+    st.dataframe(pd.DataFrame(st.session_state.historico), use_container_width=True)
