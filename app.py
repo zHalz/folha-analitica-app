@@ -567,8 +567,8 @@ with col_hist:
             column_config={
                 "data": "Data",
                 "arquivo": "Arquivo",
-                "registros": st.column_config.NumberColumn("Registros", format="%,d"),
-                "colaboradores": st.column_config.NumberColumn("Colaboradores", format="%,d")
+                "registros": st.column_config.NumberColumn("Registros", format="%d"),
+                "colaboradores": st.column_config.NumberColumn("Colaboradores", format="%d")
             }
         )
     else:
