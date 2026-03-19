@@ -10,44 +10,70 @@ from openpyxl import load_workbook
 st.set_page_config(page_title="Folha Analítica", layout="centered")
 
 # -------------------------------
-# CSS FINAL 💖
+# CSS PREMIUM DARK 💖
 # -------------------------------
 st.markdown("""
 <style>
 
-.block-container {
-    max-width: 700px;
-    margin: auto;
-    padding-top: 3rem;
-    text-align: center;
+body {
+    background-color: #0e1117;
 }
 
-/* REMOVE BORDA DO UPLOADER */
+.block-container {
+    max-width: 750px;
+    margin: auto;
+    padding-top: 2rem;
+}
+
+/* HERO */
+.hero {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+.hero h1 {
+    color: white;
+}
+.hero p {
+    color: #aaa;
+}
+
+/* CARDS */
+.card {
+    background: #161b22;
+    padding: 1.2rem;
+    border-radius: 14px;
+    margin-bottom: 1rem;
+    border: 1px solid #222;
+}
+
+/* UPLOADER */
 [data-testid="stFileUploader"] {
     border: none !important;
     background: transparent !important;
 }
 
-/* BOTÃO PROCESSAR */
+/* BOTÕES */
 .stButton>button {
     background: linear-gradient(90deg, #ff4d6d, #ff758f);
     color: white;
-    border-radius: 12px;
-    height: 2.8em;
-    font-weight: 600;
-    border: none;
+    border-radius: 10px;
+    height: 2.6em;
     width: 100%;
+    border: none;
 }
 
-/* BOTÃO DOWNLOAD */
 .stDownloadButton>button {
     background: #24a148;
     color: white;
-    border-radius: 12px;
-    height: 2.8em;
-    font-weight: 600;
-    border: none;
+    border-radius: 10px;
+    height: 2.6em;
     width: 100%;
+    border: none;
+}
+
+/* TEXTO */
+h3, h2 {
+    color: white;
 }
 
 </style>
@@ -57,14 +83,14 @@ st.markdown("""
 # HERO 💖
 # -------------------------------
 st.markdown("""
-<div>
+<div class="hero">
     <h1>📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)</h1>
-    <p>Mor, envia aqui que eu resolvo pra você rapidinho 😘</p>
+    <p>Mor, envia aqui que eu resolvo tudo pra você rapidinho 😘</p>
 </div>
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# SESSION STATE
+# SESSION
 # -------------------------------
 if "historico" not in st.session_state:
     st.session_state.historico = []
@@ -73,7 +99,7 @@ if "arquivos_processados" not in st.session_state:
     st.session_state.arquivos_processados = {}
 
 # -------------------------------
-# EXTRAÇÃO
+# EXTRAÇÃO (COM PROGRESSO)
 # -------------------------------
 def extrair_folha_analitica(pdf_path):
 
@@ -81,7 +107,14 @@ def extrair_folha_analitica(pdf_path):
 
     with pdfplumber.open(pdf_path) as pdf:
 
+        total_paginas = len(pdf.pages)
+        progress_bar = st.progress(0)
+        status = st.empty()
+
         for page_num, page in enumerate(pdf.pages):
+
+            status.info(f"📄 Página {page_num+1} de {total_paginas}")
+            progress_bar.progress((page_num + 1) / total_paginas)
 
             texto = page.extract_text() or page.extract_text(layout=True)
 
@@ -146,12 +179,9 @@ def extrair_folha_analitica(pdf_path):
                                 "valor": valor
                             })
 
-    df = pd.DataFrame(dados)
+        status.success("✅ Processamento concluído!")
 
-    if not df.empty:
-        df["nome"] = df["nome"].str.replace(r"[:\s]+$", "", regex=True).str.strip()
-
-    return df
+    return pd.DataFrame(dados)
 
 # -------------------------------
 # PROCESSAMENTO
@@ -272,41 +302,41 @@ def processar_pdf(file):
     return final, df_totvs
 
 # -------------------------------
-# CACHE
+# UPLOAD CARD
 # -------------------------------
-@st.cache_data(show_spinner=False)
-def processar_pdf_cache(file_bytes):
-    return processar_pdf(BytesIO(file_bytes))
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.subheader("💌 Envie seus PDFs")
 
-# -------------------------------
-# UPLOAD
-# -------------------------------
 uploaded_files = st.file_uploader(
-    "💌 Arrasta aqui os PDFs, amor",
+    "Arraste aqui",
     type=["pdf"],
     accept_multiple_files=True
 )
 
+st.markdown('</div>', unsafe_allow_html=True)
+
 # -------------------------------
-# UI LIMPA
+# ARQUIVOS
 # -------------------------------
 if uploaded_files:
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("📄 Arquivos")
 
     for file in uploaded_files:
 
         col1, col2, col3 = st.columns([4,1,1])
 
-        col1.write(f"📄 {file.name}")
-
-        status_msg = st.empty()
+        col1.write(file.name)
 
         if col2.button("Processar", key=file.name):
 
-            status_msg.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+            status = st.empty()
+            status.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
-            resultado, df_totvs = processar_pdf_cache(file.getvalue())
+            resultado, df_totvs = processar_pdf(file)
 
-            status_msg.success("Prontinho, meu amor 💚")
+            status.success("Prontinho, meu amor 💚")
 
             st.session_state.arquivos_processados[file.name] = resultado
 
@@ -315,15 +345,21 @@ if uploaded_files:
             col3.download_button(
                 "Baixar",
                 st.session_state.arquivos_processados[file.name],
-                file_name=f"{file.name.replace('.pdf','')}.xlsx"
+                file_name=file.name.replace(".pdf", ".xlsx")
             )
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------
 # HISTÓRICO
 # -------------------------------
 if st.session_state.historico:
-    st.divider()
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("📊 Histórico")
 
     df_hist = pd.DataFrame(st.session_state.historico)
     st.dataframe(df_hist, use_container_width=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
