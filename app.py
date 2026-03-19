@@ -149,7 +149,7 @@ if uploaded_file:
         tmp.write(uploaded_file.read())
         pdf_path = tmp.name
 
-    st.info("🔄 Processando...")
+    st.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️")
 
     df = extrair_folha_analitica(pdf_path)
 
