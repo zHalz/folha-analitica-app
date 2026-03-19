@@ -5,6 +5,7 @@ import re
 import tempfile
 from io import BytesIO
 from openpyxl import load_workbook
+import time
 
 st.set_page_config(page_title="Folha Analítica", layout="wide")
 
@@ -487,6 +488,7 @@ with col_process:
                             status_container.error("⚠️ Não foi possível extrair dados desse PDF.")
                         else:
                             progress_bar.empty()
+                            # substitui a mensagem de info por sucesso
                             status_container.success("✅ Processamento concluído! Prontinho, meu amor 💚")
 
                             # armazena o arquivo Excel + resumo
@@ -503,12 +505,21 @@ with col_process:
                                 "colaboradores": resumo["colaboradores"][0]
                             })
 
-                            # força recarregar para mostrar o botão de download imediatamente
+                            # recarregar o app para mostrar o download imediatamente
                             st.rerun()
 
                     except Exception as e:
                         progress_bar.empty()
                         status_container.error(f"❌ Erro ao processar: {str(e)}")
+
+                    # Agora, se a mensagem de sucesso foi exibida, ela fica por 7s e depois some
+                    # (Streamlit não permite “sumir sozinho” sem recarregar, então vamos recarregar após 7s)
+                    if "status_mostrado_por_7s" in st.session_state and st.session_state.status_mostrado_por_7s == file.name:
+                        time.sleep(7)
+                        st.session_state.status_mostrado_por_7s = None
+                        st.rerun()
+                    elif excel_final is not None:
+                        st.session_state.status_mostrado_por_7s = file.name
 
 # -------------------------------
 # COLUNA DIREITA – HISTÓRICO
