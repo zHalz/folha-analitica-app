@@ -10,7 +10,7 @@ from openpyxl import load_workbook
 st.set_page_config(page_title="Folha Analítica", layout="centered")
 
 # -------------------------------
-# CSS ESTILO LOVEYUU 💖
+# CSS FINAL 💖
 # -------------------------------
 st.markdown("""
 <style>
@@ -22,31 +22,13 @@ st.markdown("""
     text-align: center;
 }
 
-/* HERO */
-.hero h1 {
-    font-size: 2.2rem;
-    font-weight: 700;
-}
-.hero p {
-    color: #888;
-    font-size: 1rem;
+/* REMOVE BORDA DO UPLOADER */
+[data-testid="stFileUploader"] {
+    border: none !important;
+    background: transparent !important;
 }
 
-/* UPLOAD */
-.upload-box {
-    border: 2px dashed #ddd;
-    border-radius: 16px;
-    padding: 2rem;
-    background-color: #fafafa;
-    margin-top: 1rem;
-}
-
-/* REMOVE LABEL */
-[data-testid="stFileUploader"] label {
-    display: none;
-}
-
-/* BOTÕES */
+/* BOTÃO PROCESSAR */
 .stButton>button {
     background: linear-gradient(90deg, #ff4d6d, #ff758f);
     color: white;
@@ -54,25 +36,18 @@ st.markdown("""
     height: 2.8em;
     font-weight: 600;
     border: none;
+    width: 100%;
 }
 
+/* BOTÃO DOWNLOAD */
 .stDownloadButton>button {
-    background: #111;
+    background: #24a148;
     color: white;
     border-radius: 12px;
     height: 2.8em;
     font-weight: 600;
-}
-
-/* FILE ITEM */
-.file-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #f5f5f5;
-    padding: 0.6rem 1rem;
-    border-radius: 10px;
-    margin-top: 0.5rem;
+    border: none;
+    width: 100%;
 }
 
 </style>
@@ -82,7 +57,7 @@ st.markdown("""
 # HERO 💖
 # -------------------------------
 st.markdown("""
-<div class="hero">
+<div>
     <h1>📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)</h1>
     <p>Mor, envia aqui que eu resolvo pra você rapidinho 😘</p>
 </div>
@@ -106,14 +81,7 @@ def extrair_folha_analitica(pdf_path):
 
     with pdfplumber.open(pdf_path) as pdf:
 
-        total_paginas = len(pdf.pages)
-        progresso = st.progress(0)
-        status = st.empty()
-
         for page_num, page in enumerate(pdf.pages):
-
-            status.text(f"📄 Página {page_num+1} de {total_paginas}")
-            progresso.progress((page_num + 1) / total_paginas)
 
             texto = page.extract_text() or page.extract_text(layout=True)
 
@@ -178,8 +146,6 @@ def extrair_folha_analitica(pdf_path):
                                 "valor": valor
                             })
 
-        status.text("✅ Concluído")
-
     df = pd.DataFrame(dados)
 
     if not df.empty:
@@ -191,8 +157,6 @@ def extrair_folha_analitica(pdf_path):
 # PROCESSAMENTO
 # -------------------------------
 def processar_pdf(file):
-
-    st.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(file.read())
@@ -268,9 +232,6 @@ def processar_pdf(file):
     buffer = BytesIO()
 
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name="Detalhamento", index=False)
-        pivot.to_excel(writer, sheet_name="Pivot", index=False)
-        analise.to_excel(writer, sheet_name="Analise", index=False)
         df_totvs.to_excel(writer, sheet_name="Base_TOTVS", index=False)
 
     buffer.seek(0)
@@ -320,23 +281,16 @@ def processar_pdf_cache(file_bytes):
 # -------------------------------
 # UPLOAD
 # -------------------------------
-st.markdown('<div class="upload-box">', unsafe_allow_html=True)
-
 uploaded_files = st.file_uploader(
-    "upload",
+    "💌 Arrasta aqui os PDFs, amor",
     type=["pdf"],
-    accept_multiple_files=True,
-    label_visibility="collapsed"
+    accept_multiple_files=True
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 # -------------------------------
-# UI
+# UI LIMPA
 # -------------------------------
 if uploaded_files:
-
-    st.markdown("### 💖 Seus arquivos")
 
     for file in uploaded_files:
 
@@ -344,22 +298,20 @@ if uploaded_files:
 
         col1.write(f"📄 {file.name}")
 
-        processar = col2.button("Processar", key=file.name)
+        status_msg = st.empty()
 
-        if processar:
+        if col2.button("Processar", key=file.name):
+
+            status_msg.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+
             resultado, df_totvs = processar_pdf_cache(file.getvalue())
+
+            status_msg.success("Prontinho, meu amor 💚")
 
             st.session_state.arquivos_processados[file.name] = resultado
 
-            st.session_state.historico.append({
-                "arquivo": file.name,
-                "data": datetime.now().strftime("%d/%m %H:%M"),
-                "linhas": len(df_totvs)
-            })
-
-            st.success("Prontinho, meu amor 💚")
-
         if file.name in st.session_state.arquivos_processados:
+
             col3.download_button(
                 "Baixar",
                 st.session_state.arquivos_processados[file.name],
