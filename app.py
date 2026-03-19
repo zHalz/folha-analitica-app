@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 st.set_page_config(page_title="Folha Analítica", layout="centered")
 
 # -------------------------------
-# ESTILO (deixa bonito)
+# ESTILO
 # -------------------------------
 st.markdown("""
     <style>
@@ -36,16 +36,16 @@ st.markdown("""
 # TÍTULO
 # -------------------------------
 st.title("📄 Processador de Folha Analítica pra minha preta (Karem 💍♥️)")
-st.caption("Mor, envie o PDF e receba o Excel pronto para importação")
+st.caption("Mor, envie o PDF e receba o Excel pronto")
 
 # -------------------------------
-# HISTÓRICO (sessão)
+# HISTÓRICO
 # -------------------------------
 if "historico" not in st.session_state:
     st.session_state.historico = []
 
 # -------------------------------
-# FUNÇÃO EXTRAÇÃO COM PROGRESSO
+# EXTRAÇÃO
 # -------------------------------
 def extrair_folha_analitica(pdf_path):
 
@@ -54,17 +54,15 @@ def extrair_folha_analitica(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
 
         total_paginas = len(pdf.pages)
-
         progresso = st.progress(0)
         status = st.empty()
 
         for page_num, page in enumerate(pdf.pages):
 
-            status.text(f"📄 Processando página {page_num+1} de {total_paginas}")
-
+            status.text(f"📄 Página {page_num+1}/{total_paginas}")
             progresso.progress((page_num + 1) / total_paginas)
 
-            texto = page.extract_text() or page.extract_text(layout=True) or page.extract_text(x_tolerance=3)
+            texto = page.extract_text() or ""
 
             if not texto:
                 continue
@@ -74,72 +72,41 @@ def extrair_folha_analitica(pdf_path):
             nome_atual = None
             matricula_atual = None
 
-            for i, linha in enumerate(linhas):
+            for linha in linhas:
 
-                linha = linha.strip()
-                linha = re.sub(r"\s{2,}", " ", linha)
+                linha = re.sub(r"\s{2,}", " ", linha.strip())
 
-                mat_match = re.search(r"MAT\.?\s*:?\s*(\d{5,7})", linha)
-                if mat_match:
-                    matricula_atual = mat_match.group(1)
+                mat = re.search(r"MAT\.?\s*:?\s*(\d+)", linha)
+                if mat:
+                    matricula_atual = mat.group(1)
 
-                nome_match = re.search(
-                    r"NOME\s*:?\s*([A-ZÀ-Ú\s]+?)(?:FUNCAO|FUNC|DT|$)",
-                    linha
-                )
-                if nome_match:
-                    nome_atual = nome_match.group(1).strip()
+                nome = re.search(r"NOME\s*:?\s*([A-ZÀ-Ú\s]+)", linha)
+                if nome:
+                    nome_atual = nome.group(1).strip()
 
-                if "|" in linha and re.search(r"\d{3}", linha):
+                if "|" in linha:
 
                     partes = linha.split("|")
 
-                    nome_final = nome_atual if nome_atual else "SEM_NOME"
-                    matricula_final = matricula_atual if matricula_atual else "SEM_MAT"
-
                     for idx, parte in enumerate(partes):
 
-                        parte = parte.strip()
-                        if not parte:
-                            continue
+                        match = re.match(r"(\d{3})\s+(.+?)\s+([\d.,]+)", parte.strip())
 
-                        evento_match = re.match(
-                            r"(\d{3})\s+(.+?)\s+([\d,]+)?\s+([\d.,]+)",
-                            parte
-                        )
+                        if match:
+                            cod, desc, valor = match.groups()
 
-                        if evento_match:
-
-                            codigo, desc, ref, valor = evento_match.groups()
-
-                            tipo = "PROVENTO" if idx == 0 else "DESCONTO"
-
-                            valor = valor.replace(".", "").replace(",", ".")
-
-                            try:
-                                valor = float(valor)
-                            except:
-                                continue
+                            valor = float(valor.replace(".", "").replace(",", "."))
 
                             dados.append({
-                                "pagina": page_num + 1,
-                                "nome": nome_final,
-                                "matricula": matricula_final,
-                                "tipo": tipo,
-                                "codigo": codigo,
-                                "descricao": desc.strip(),
+                                "nome": nome_atual,
+                                "matricula": matricula_atual,
+                                "tipo": "PROVENTO" if idx == 0 else "DESCONTO",
+                                "codigo": cod,
+                                "descricao": desc,
                                 "valor": valor
                             })
 
-        status.text("✅ Extração concluída!")
-
-    df = pd.DataFrame(dados)
-
-    if not df.empty:
-        df["nome"] = df["nome"].str.replace(r"[:\s]+$", "", regex=True).str.strip()
-
-    return df
-
+    return pd.DataFrame(dados)
 
 # -------------------------------
 # UPLOAD
@@ -148,24 +115,17 @@ uploaded_file = st.file_uploader("📤 Envie o PDF", type=["pdf"])
 
 if uploaded_file:
 
-    nome_arquivo = uploaded_file.name
-
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(uploaded_file.read())
         pdf_path = tmp.name
 
-    st.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+    df = extrair_folha_analitica(pdf_path)
 
-    df_consolidado = extrair_folha_analitica(pdf_path)
-
-    if df_consolidado.empty:
+    if df.empty:
         st.error("❌ Nenhum dado encontrado")
         st.stop()
 
-    # -------------------------------
-    # PIVOT
-    # -------------------------------
-    pivot_completa = df_consolidado.pivot_table(
+    pivot = df.pivot_table(
         values="valor",
         index=["nome", "matricula", "tipo"],
         columns="codigo",
@@ -173,161 +133,87 @@ if uploaded_file:
         fill_value=0
     ).reset_index()
 
-    # -------------------------------
-    # ANÁLISE
-    # -------------------------------
     mapa = {
-        "455": "Assistência Médica Titular",
-        "454": "Assistência Odontológica Titular",
-        "458": "Coparticipação",
-        "456": "Assistência Médica Dependente",
-        "461": "Assistência Odontológica Dependente"
+        "455": "Med_Tit",
+        "454": "Odo_Tit",
+        "458": "Cop",
+        "456": "Med_Dep",
+        "461": "Odo_Dep"
     }
 
     for col in mapa:
-        if col not in pivot_completa.columns:
-            pivot_completa[col] = 0
+        if col not in pivot.columns:
+            pivot[col] = 0
 
-    analise = pivot_completa[
-        ["nome", "matricula"] + list(mapa.keys())
-    ].rename(columns=mapa)
+    analise = pivot[["nome","matricula"]+list(mapa.keys())].rename(columns=mapa)
+    analise = analise.groupby(["nome","matricula"]).sum().reset_index()
 
-    analise = analise.groupby(["nome", "matricula"]).sum().reset_index()
-
-    # -------------------------------
-    # SPLIT
-    # -------------------------------
     linhas = []
 
-    for _, row in analise.iterrows():
+    for _, r in analise.iterrows():
 
-        med_tit = row["Assistência Médica Titular"]
-        odo_tit = row["Assistência Odontológica Titular"]
-
-        med_dep = row["Assistência Médica Dependente"]
-        odo_dep = row["Assistência Odontológica Dependente"]
-
-        qtd_med = int(round(med_dep / med_tit)) if med_tit > 0 else 0
-        qtd_odo = int(round(odo_dep / odo_tit)) if odo_tit > 0 else 0
-
-        qtd = max(qtd_med, qtd_odo)
-
-        # TITULAR
         linhas.append({
-            "nome": row["nome"],
-            "matricula": row["matricula"],
+            "nome": r["nome"],
+            "matricula": r["matricula"],
             "tipo_registro": "TITULAR",
             "dependente_id": 0,
-            "vlr_medico": med_tit,
-            "vlr_odonto": odo_tit,
-            "vlr_copart": row["Coparticipação"],
-            "total": med_tit + odo_tit + row["Coparticipação"]
+            "vlr_medico": r["Med_Tit"],
+            "vlr_odonto": r["Odo_Tit"],
+            "vlr_copart": r["Cop"],
+            "total": r["Med_Tit"] + r["Odo_Tit"] + r["Cop"]
         })
-
-        # DEPENDENTES
-        for i in range(qtd):
-
-            vlr_med = med_dep / qtd_med if i < qtd_med and qtd_med > 0 else 0
-            vlr_odo = odo_dep / qtd_odo if i < qtd_odo and qtd_odo > 0 else 0
-
-            linhas.append({
-                "nome": row["nome"],
-                "matricula": row["matricula"],
-                "tipo_registro": "DEPENDENTE",
-                "dependente_id": i + 1,
-                "vlr_medico": round(vlr_med, 2),
-                "vlr_odonto": round(vlr_odo, 2),
-                "vlr_copart": 0,
-                "total": round(vlr_med + vlr_odo, 2)
-            })
 
     df_totvs = pd.DataFrame(linhas)
 
     # -------------------------------
-    # GERAR EXCEL
+    # EXCEL
     # -------------------------------
     output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
 
     with pd.ExcelWriter(output.name, engine="openpyxl") as writer:
-    df_consolidado.to_excel(writer, sheet_name="Detalhamento", index=False)
-    pivot_completa.to_excel(writer, sheet_name="Pivot", index=False)
-    analise.to_excel(writer, sheet_name="Analise", index=False)
-    df_totvs.to_excel(writer, sheet_name="TOTVS", index=False)
-
-# ------------------------------------------
-# PÓS-PROCESSAMENTO EXCEL (TOTVS)
-# ------------------------------------------
-
-wb = load_workbook(output.name)
-ws = wb["TOTVS"]
-
-# Última linha REAL (coluna C = tipo_registro)
-ultima_linha = max(
-    cell.row for cell in ws["C"] if cell.value is not None
-)
-
-# Linhas finais
-linha_titular = ultima_linha + 2
-linha_dependente = ultima_linha + 3
-
-# Labels
-ws[f"D{linha_titular}"] = "TITULAR"
-ws[f"D{linha_dependente}"] = "DEPENDENTE"
-
-# Range dinâmico
-range_e = f"E2:E{ultima_linha}"
-range_f = f"F2:F{ultima_linha}"
-range_g = f"G2:G{ultima_linha}"
-range_h = f"H2:H{ultima_linha}"
-range_c = f"C2:C{ultima_linha}"
-
-# ------------------------------------------
-# TITULAR
-# ------------------------------------------
-
-ws[f"E{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_titular})+0)'
-ws[f"F{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_titular})+0)'
-ws[f"G{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_titular})+0)'
-ws[f"H{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_titular})+0)'
-
-# ------------------------------------------
-# DEPENDENTE
-# ------------------------------------------
-
-ws[f"E{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_dependente})+0)'
-ws[f"F{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_dependente})+0)'
-ws[f"G{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_dependente})+0)'
-ws[f"H{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_dependente})+0)'
-
-# Forçar recálculo no Excel
-wb.calculation.fullCalcOnLoad = True
-
-# Salvar
-wb.save(output.name)
+        df.to_excel(writer, sheet_name="Detalhamento", index=False)
+        pivot.to_excel(writer, sheet_name="Pivot", index=False)
+        analise.to_excel(writer, sheet_name="Analise", index=False)
+        df_totvs.to_excel(writer, sheet_name="TOTVS", index=False)
 
     # -------------------------------
-    # HISTÓRICO
+    # PÓS PROCESSAMENTO
     # -------------------------------
-    st.session_state.historico.append({
-        "arquivo": nome_arquivo,
-        "data": datetime.now().strftime("%d/%m %H:%M"),
-        "linhas": len(df_totvs)
-    })
+    wb = load_workbook(output.name)
+    ws = wb["TOTVS"]
+
+    ultima_linha = max(cell.row for cell in ws["C"] if cell.value)
+
+    lt = ultima_linha + 2
+    ld = ultima_linha + 3
+
+    ws[f"D{lt}"] = "TITULAR"
+    ws[f"D{ld}"] = "DEPENDENTE"
+
+    range_e = f"E2:E{ultima_linha}"
+    range_f = f"F2:F{ultima_linha}"
+    range_g = f"G2:G{ultima_linha}"
+    range_h = f"H2:H{ultima_linha}"
+    range_c = f"C2:C{ultima_linha}"
+
+    # TITULAR
+    ws[f"E{lt}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{lt})+0)'
+    ws[f"F{lt}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{lt})+0)'
+    ws[f"G{lt}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{lt})+0)'
+    ws[f"H{lt}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{lt})+0)'
+
+    # DEPENDENTE
+    ws[f"E{ld}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{ld})+0)'
+    ws[f"F{ld}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{ld})+0)'
+    ws[f"G{ld}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{ld})+0)'
+    ws[f"H{ld}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{ld})+0)'
+
+    wb.calculation.fullCalcOnLoad = True
+    wb.save(output.name)
 
     # -------------------------------
     # DOWNLOAD
     # -------------------------------
     with open(output.name, "rb") as f:
-        st.success("✅ Concluído!")
-        st.download_button("⬇️ Baixar Excel", f, file_name="folha_processada.xlsx")
-
-# -------------------------------
-# EXIBIR HISTÓRICO
-# -------------------------------
-if st.session_state.historico:
-
-    st.divider()
-    st.subheader("📊 Histórico de Processamentos")
-
-    hist_df = pd.DataFrame(st.session_state.historico)
-    st.dataframe(hist_df, use_container_width=True)
+        st.success("✅ Pronto!")
+        st.download_button("⬇️ Baixar Excel", f, file_name="folha.xlsx")
