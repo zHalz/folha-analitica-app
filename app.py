@@ -34,8 +34,9 @@ st.markdown("""
 # -------------------------------
 # TÍTULO
 # -------------------------------
-st.title("📄 Processador de Folha Analítica")
-st.caption("Envie o PDF e receba o Excel pronto para importação")
+st.title("📄 Processador de Folha Analítica pra minha namorada (Karem 💍♥️)")
+st.title("📄 Processador de Folha Analítica pra minha preta (Karem 💍♥️)")
+st.caption("Mor, envie o PDF e receba o Excel pronto para importação")
 
 # -------------------------------
 # HISTÓRICO (sessão)
@@ -153,7 +154,7 @@ if uploaded_file:
         tmp.write(uploaded_file.read())
         pdf_path = tmp.name
 
-    st.info("🔄 Iniciando processamento...")
+    st.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
     df_consolidado = extrair_folha_analitica(pdf_path)
 
