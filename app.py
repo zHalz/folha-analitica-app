@@ -37,7 +37,7 @@ st.markdown("""
 # TÍTULO
 # -------------------------------
 st.title("📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)")
-st.caption("Envie o PDF e receba o Excel pronto para o TOTVS")
+st.caption("Mor, envie o PDF e receba o Excel pronto para o TOTVS")
 
 # -------------------------------
 # HISTÓRICO
