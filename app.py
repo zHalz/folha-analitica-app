@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 st.set_page_config(page_title="Folha Analítica", layout="wide")
 
 # -------------------------------
-# CSS MODERNO DARK E FLUIDO COM HOVER E AJUSTE NO TÍTULO 💖
+# CSS MODERNO DARK E FLUIDO 💖
 # -------------------------------
 st.markdown("""
 <style>
@@ -20,7 +20,6 @@ st.markdown("""
     --accent-start: #ff4d6d;
     --accent-end: #ff758f;
     --success: #24a148;
-    --border-soft: #2d3748;
 }
 
 body {
@@ -29,33 +28,29 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Ajuste: reduz espaçamento top do hero e faz o texto quebrar com segurança */
+.block-container {
+    min-height: 100vh;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+h1, h2, h3 {
+    color: white;
+}
+
 .hero {
     text-align: center;
-    margin-bottom: 1rem;
-    padding: 1rem 0.5rem 0;
+    margin-bottom: 1.5rem;
 }
 .hero h1 {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
     font-weight: 600;
-    margin: 0;
-    line-height: 1.2;
 }
 .hero p {
     color: var(--secondary-text);
-    font-size: 1.05rem;
-    margin-top: 0.5rem;
+    font-size: 1.1rem;
 }
 
-/* Ajusta o container principal para nunca cortar o título */
-.block-container {
-    min-height: 100vh;
-    padding-top: 1.2rem;
-    padding-bottom: 1rem;
-    max-width: 1400px;
-}
-
-/* Botão de ação (Processar) */
 .stButton>button {
     background: linear-gradient(90deg, var(--accent-start), var(--accent-end));
     color: white;
@@ -63,12 +58,11 @@ body {
     height: 2.6em;
     border: none;
     font-weight: 500;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 .stButton>button:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(255, 100, 130, 0.3);
-    filter: brightness(1.05);
 }
 .stButton>button:disabled {
     background: linear-gradient(90deg, #88334d, #99445f);
@@ -76,57 +70,27 @@ body {
     cursor: not-allowed;
 }
 
-/* Botão de download */
 .stDownloadButton>button {
     background-color: var(--success) !important;
     border-radius: 8px;
     height: 2.6em;
     border: none;
     font-weight: 500;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 .stDownloadButton>button:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(36, 161, 72, 0.3);
 }
 
-/* Tabela de histórico */
 .stDataFrame {
     border-radius: 8px;
     overflow: hidden;
 }
 
-/* Títulos de seção */
 .section-title {
     margin-top: 1rem;
     margin-bottom: 0.8rem;
-}
-
-/* Ajuste sutil para o upload (não afetar o layout do hero) */
-[data-testid="stFileUploader"] {
-    margin-bottom: 1.2rem;
-}
-
-/* FAKE HOVER COM GLASS LIQUEFICAO DO MOUSE (hover suave na “caixa” de cada arquivo) */
-.file-row {
-    border-radius: 10px;
-    background-color: var(--surface-dark);
-    border: 1px solid var(--border-soft);
-    padding: 0.8rem 1rem;
-    margin-bottom: 0.8rem;
-    transition: all 0.25s ease, box-shadow 0.25s ease;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-.file-row:hover {
-    background-color: rgba(13, 17, 23, 0.95);
-    box-shadow: 0 4px 16px rgba(255, 77, 109, 0.3);
-    transform: translateY(-2px);
-}
-
-/* Ajuste de texto dentro da linha de arquivo */
-.file-row h4, .file-row p, .file-row div {
-    margin: 0;
-    padding: 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -466,7 +430,7 @@ def processar_pdf(file, status_container, progress_bar):
 col_process, col_hist = st.columns([2, 1], gap="medium")
 
 # -------------------------------
-# COLUNA ESQUERDA – PROCESSAMENTO COM CAIXA POR ARQUIVO 💖
+# COLUNA ESQUERDA – PROCESSAMENTO COM PROGRESSO 💖
 # -------------------------------
 with col_process:
 
@@ -482,39 +446,34 @@ with col_process:
     if uploaded_files:
 
         for file in uploaded_files:
-
-            # CAIXA POR ARQUIVO – tudo dentro
-            st.markdown('<div class="file-block">', unsafe_allow_html=True)
-
-            # fila 1: nome / processar / baixar
-            cols = st.columns([4, 1, 1], gap="small")
-            nome_col = cols[0]
-            proc_col = cols[1]
-            down_col = cols[2]
+            aux_cols = st.columns([4, 1, 1])
 
             if file.name in st.session_state.arquivos_processados:
-                nome_col.markdown(f"✅ <span style='color:#79c0ff;font-weight:500;'>{file.name}</span>", unsafe_allow_html=True)
-                proc_col.button("Processar", key=f"proc_{file.name}", disabled=True)
-                down_col.download_button(
+                # já processado: botão desabilitado + download
+                aux_cols[0].markdown(f"✅ {file.name}")
+                aux_cols[1].button("Processar", key=file.name, disabled=True)
+
+                # botão de download (já conectado ao BytesIO)
+                aux_cols[2].download_button(
                     "Baixar",
                     st.session_state.arquivos_processados[file.name]["file"],
                     file_name=file.name.replace(".pdf", ".xlsx"),
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"down_{file.name}"
+                    key=f"download_{file.name}"
                 )
 
-                # linha de resumo
-                resumo = st.session_state.arquivos_processados[file.name].get("resumo", None)
-                if resumo is not None:
-                    st.caption(
-                        f"📊 Registros: {resumo['registros_extraidos'][0]:,} · "
-                        f"👥 Colaboradores: {resumo['colaboradores'][0]:,}"
-                    )
+                # mostra resumo do arquivo já processado
+                resumo = st.session_state.arquivos_processados[file.name]["resumo"]
+                st.caption(
+                    f"📊 Registros: {resumo['registros_extraidos'][0]:,} · "
+                    f"👥 Colaboradores: {resumo['colaboradores'][0]:,}"
+                )
 
             else:
-                nome_col.markdown(f"📎 <span style='color:#adbac7;font-weight:500;'>{file.name}</span>", unsafe_allow_html=True)
+                # novo arquivo
+                aux_cols[0].markdown(f"📎 {file.name}")
 
-                if proc_col.button("Processar", key=f"proc_{file.name}"):
+                if aux_cols[1].button("Processar", key=file.name):
                     status_container = st.empty()
                     progress_bar = st.progress(0)
 
@@ -530,11 +489,13 @@ with col_process:
                             progress_bar.empty()
                             status_container.success("✅ Processamento concluído! Prontinho, meu amor 💚")
 
+                            # armazena o arquivo Excel + resumo
                             st.session_state.arquivos_processados[file.name] = {
                                 "file": excel_final,
                                 "resumo": resumo
                             }
 
+                            # adiciona ao histórico global
                             st.session_state.historico.append({
                                 "arquivo": file.name,
                                 "data": resumo["data"][0],
@@ -542,16 +503,15 @@ with col_process:
                                 "colaboradores": resumo["colaboradores"][0]
                             })
 
+                            # força recarregar para mostrar o botão de download imediatamente
                             st.rerun()
 
                     except Exception as e:
                         progress_bar.empty()
                         status_container.error(f"❌ Erro ao processar: {str(e)}")
 
-            st.markdown('</div>', unsafe_allow_html=True)
-
 # -------------------------------
-# COLUNA DIREITA – HISTÓRICO MELHORADO 💖
+# COLUNA DIREITA – HISTÓRICO
 # -------------------------------
 with col_hist:
 
