@@ -139,11 +139,12 @@ def extrair_folha_analitica(pdf_path):
 
     return df
 
-
 # -------------------------------
 # PROCESSAMENTO
 # -------------------------------
 def processar_pdf(file):
+
+    st.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(file.read())
@@ -239,16 +240,28 @@ def processar_pdf(file):
     ws[f"D{linha_tit}"] = "TITULAR"
     ws[f"D{linha_dep}"] = "DEPENDENTE"
 
+    linha_inicio = 2
+    linha_fim = ultima
+
     for col in ["E", "F", "G", "H"]:
-        ws[f"{col}{linha_tit}"] = f'=SUMIF(C:C,"TITULAR",{col}:{col})'
-        ws[f"{col}{linha_dep}"] = f'=SUMIF(C:C,"DEPENDENTE",{col}:{col})'
+        ws[f"{col}{linha_tit}"] = (
+            f'=SOMARPRODUTO('
+            f'SUBTOTAL(9;DESLOC({col}{linha_inicio};LIN({col}{linha_inicio}:{col}{linha_fim})-LIN({col}{linha_inicio});0));'
+            f'($C${linha_inicio}:$C${linha_fim}=$D${linha_tit})+0)'
+        )
+
+    for col in ["E", "F", "G", "H"]:
+        ws[f"{col}{linha_dep}"] = (
+            f'=SOMARPRODUTO('
+            f'SUBTOTAL(9;DESLOC({col}{linha_inicio};LIN({col}{linha_inicio}:{col}{linha_fim})-LIN({col}{linha_inicio});0));'
+            f'($C${linha_inicio}:$C${linha_fim}=$D${linha_dep})+0)'
+        )
 
     final = BytesIO()
     wb.save(final)
     final.seek(0)
 
     return final, df_totvs
-
 
 # -------------------------------
 # UPLOAD MULTIPLO
