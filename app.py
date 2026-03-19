@@ -171,8 +171,8 @@ if uploaded_file:
     output = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
 
     with pd.ExcelWriter(output.name, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name="Detalhamento", index=False)
-        pivot.to_excel(writer, sheet_name="Pivot", index=False)
+        df_consolidado.to_excel(writer, sheet_name="Detalhamento", index=False)
+        pivot_completa.to_excel(writer, sheet_name="Pivot", index=False)
         analise.to_excel(writer, sheet_name="Analise", index=False)
         df_totvs.to_excel(writer, sheet_name="TOTVS", index=False)
 
