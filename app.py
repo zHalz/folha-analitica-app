@@ -37,13 +37,16 @@ st.markdown("""
 # TÍTULO
 # -------------------------------
 st.title("📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)")
-st.caption("Mor, envie o PDF e receba o Excel pronto para o TOTVS")
+st.caption("Mor, envie um ou mais PDFs e baixe o Excel pronto")
 
 # -------------------------------
-# HISTÓRICO
+# SESSION STATE
 # -------------------------------
 if "historico" not in st.session_state:
     st.session_state.historico = []
+
+if "arquivos_processados" not in st.session_state:
+    st.session_state.arquivos_processados = {}
 
 # -------------------------------
 # EXTRAÇÃO
@@ -55,13 +58,12 @@ def extrair_folha_analitica(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
 
         total_paginas = len(pdf.pages)
-
         progresso = st.progress(0)
         status = st.empty()
 
         for page_num, page in enumerate(pdf.pages):
 
-            status.text(f"📄 Processando página {page_num+1} de {total_paginas}")
+            status.text(f"📄 Página {page_num+1} de {total_paginas}")
             progresso.progress((page_num + 1) / total_paginas)
 
             texto = page.extract_text() or page.extract_text(layout=True) or page.extract_text(x_tolerance=3)
@@ -128,7 +130,7 @@ def extrair_folha_analitica(pdf_path):
                                 "valor": valor
                             })
 
-        status.text("✅ Extração concluída!")
+        status.text("✅ Concluído")
 
     df = pd.DataFrame(dados)
 
@@ -139,27 +141,16 @@ def extrair_folha_analitica(pdf_path):
 
 
 # -------------------------------
-# UPLOAD
+# PROCESSAMENTO
 # -------------------------------
-uploaded_file = st.file_uploader("📤 Envie o PDF", type=["pdf"])
-
-if uploaded_file:
+def processar_pdf(file):
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        tmp.write(uploaded_file.read())
+        tmp.write(file.read())
         pdf_path = tmp.name
-
-    st.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
     df = extrair_folha_analitica(pdf_path)
 
-    if df.empty:
-        st.error("❌ Nenhum dado encontrado")
-        st.stop()
-
-    # -------------------------------
-    # PIVOT
-    # -------------------------------
     pivot = df.pivot_table(
         values="valor",
         index=["nome", "matricula", "tipo"],
@@ -168,9 +159,6 @@ if uploaded_file:
         fill_value=0
     ).reset_index()
 
-    # -------------------------------
-    # ANÁLISE
-    # -------------------------------
     mapa = {
         "455": "Assistência Médica Titular",
         "454": "Assistência Odontológica Titular",
@@ -186,9 +174,6 @@ if uploaded_file:
     analise = pivot[["nome", "matricula"] + list(mapa.keys())].rename(columns=mapa)
     analise = analise.groupby(["nome", "matricula"]).sum().reset_index()
 
-    # -------------------------------
-    # SPLIT
-    # -------------------------------
     linhas = []
 
     for _, row in analise.iterrows():
@@ -204,7 +189,6 @@ if uploaded_file:
 
         qtd = max(qtd_med, qtd_odo)
 
-        # TITULAR
         linhas.append({
             "nome": row["nome"],
             "matricula": row["matricula"],
@@ -216,7 +200,6 @@ if uploaded_file:
             "total": med_tit + odo_tit + row["Coparticipação"]
         })
 
-        # DEPENDENTES
         for i in range(qtd):
 
             vlr_med = med_dep / qtd_med if i < qtd_med and qtd_med > 0 else 0
@@ -235,9 +218,6 @@ if uploaded_file:
 
     df_totvs = pd.DataFrame(linhas)
 
-    # -------------------------------
-    # EXCEL EM MEMÓRIA
-    # -------------------------------
     buffer = BytesIO()
 
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
@@ -248,9 +228,6 @@ if uploaded_file:
 
     buffer.seek(0)
 
-    # -------------------------------
-    # PÓS-PROCESSAMENTO TOTVS
-    # -------------------------------
     wb = load_workbook(buffer)
     ws = wb["Base_TOTVS"]
 
@@ -270,28 +247,47 @@ if uploaded_file:
     wb.save(final)
     final.seek(0)
 
-    # -------------------------------
-    # HISTÓRICO
-    # -------------------------------
-    st.session_state.historico.append({
-        "arquivo": uploaded_file.name,
-        "data": datetime.now().strftime("%d/%m %H:%M"),
-        "linhas": len(df_totvs)
-    })
+    return final, df_totvs
 
-    # -------------------------------
-    # DOWNLOAD
-    # -------------------------------
-    st.success("✅ Pronto!")
-
-    st.download_button(
-        "⬇️ Baixar Excel",
-        final,
-        file_name="folha_processada.xlsx"
-    )
 
 # -------------------------------
-# HISTÓRICO VISUAL
+# UPLOAD MULTIPLO
+# -------------------------------
+uploaded_files = st.file_uploader(
+    "📤 Envie um ou mais PDFs",
+    type=["pdf"],
+    accept_multiple_files=True
+)
+
+if uploaded_files:
+
+    for file in uploaded_files:
+
+        st.divider()
+        st.subheader(f"📄 {file.name}")
+
+        if st.button(f"🚀 Processar {file.name}"):
+
+            resultado, df_totvs = processar_pdf(file)
+
+            st.session_state.arquivos_processados[file.name] = resultado
+
+            st.session_state.historico.append({
+                "arquivo": file.name,
+                "data": datetime.now().strftime("%d/%m %H:%M"),
+                "linhas": len(df_totvs)
+            })
+
+        if file.name in st.session_state.arquivos_processados:
+
+            st.download_button(
+                f"⬇️ Baixar {file.name}",
+                st.session_state.arquivos_processados[file.name],
+                file_name=f"{file.name.replace('.pdf','')}.xlsx"
+            )
+
+# -------------------------------
+# HISTÓRICO
 # -------------------------------
 if st.session_state.historico:
     st.divider()
