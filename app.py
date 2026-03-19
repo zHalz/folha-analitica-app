@@ -14,15 +14,26 @@ st.set_page_config(page_title="Folha Analítica", layout="centered")
 # -------------------------------
 st.markdown("""
 <style>
+:root {
+    --bg-dark: #0e1117;
+    --card-dark: #161b22;
+    --border-dark: #222;
+    --accent-grad-start: #ff4d6d;
+    --accent-grad-end: #ff758f;
+    --light-text: #aaa;
+}
 
 body {
-    background-color: #0e1117;
+    background-color: var(--bg-dark);
+    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .block-container {
     max-width: 750px;
     margin: auto;
     padding-top: 2rem;
+    padding-bottom: 3rem;
 }
 
 /* HERO */
@@ -32,18 +43,22 @@ body {
 }
 .hero h1 {
     color: white;
+    font-weight: 600;
+    font-size: 1.8rem;
 }
 .hero p {
-    color: #aaa;
+    color: var(--light-text);
+    font-size: 1.1rem;
 }
 
 /* CARDS */
 .card {
-    background: #161b22;
+    background: var(--card-dark);
     padding: 1.2rem;
     border-radius: 14px;
-    margin-bottom: 1rem;
-    border: 1px solid #222;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-dark);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* UPLOADER */
@@ -54,16 +69,22 @@ body {
 
 /* BOTÕES */
 .stButton>button {
-    background: linear-gradient(90deg, #ff4d6d, #ff758f);
+    background: linear-gradient(90deg, var(--accent-grad-start), var(--accent-grad-end));
     color: white;
     border-radius: 10px;
     height: 2.6em;
     width: 100%;
     border: none;
+    font-weight: 500;
+}
+
+.stButton>button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .stDownloadButton>button {
-    background: #24a148;
+    background-color: #24a148 !important;
     color: white;
     border-radius: 10px;
     height: 2.6em;
@@ -72,10 +93,15 @@ body {
 }
 
 /* TEXTO */
-h3, h2 {
+h2, h3, h4 {
     color: white;
 }
 
+/* TABELA */
+.stDataFrame {
+    margin-top: 0.5rem;
+    border-radius: 8px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -113,7 +139,7 @@ def extrair_folha_analitica(pdf_path):
 
         for page_num, page in enumerate(pdf.pages):
 
-            status.info(f"📄 Página {page_num+1} de {total_paginas}")
+            status.markdown(f"**🔄 Página {page_num+1} de {total_paginas}**")
             progress_bar.progress((page_num + 1) / total_paginas)
 
             texto = page.extract_text() or page.extract_text(layout=True)
@@ -121,7 +147,7 @@ def extrair_folha_analitica(pdf_path):
             if not texto:
                 continue
 
-            linhas = texto.split("\n")
+            linhas = texto.split("\\n")
 
             nome_atual = None
             matricula_atual = None
@@ -129,20 +155,20 @@ def extrair_folha_analitica(pdf_path):
             for linha in linhas:
 
                 linha = linha.strip()
-                linha = re.sub(r"\s{2,}", " ", linha)
+                linha = re.sub(r"\\s{2,}", " ", linha)
 
-                mat_match = re.search(r"MAT\.?\s*:?\s*(\d{5,7})", linha)
+                mat_match = re.search(r"MAT\\.?\\s*:?\\s*(\\d{5,7})", linha)
                 if mat_match:
                     matricula_atual = mat_match.group(1)
 
                 nome_match = re.search(
-                    r"NOME\s*:?\s*([A-ZÀ-Ú\s]+?)(?:FUNCAO|FUNC|DT|$)",
+                    r"NOME\\s*:?\\s*([A-ZÀ-Ú\\s]+?)(?:FUNCAO|FUNC|DT|$)",
                     linha
                 )
                 if nome_match:
                     nome_atual = nome_match.group(1).strip()
 
-                if "|" in linha and re.search(r"\d{3}", linha):
+                if "|" in linha and re.search(r"\\d{3}", linha):
 
                     partes = linha.split("|")
 
@@ -153,7 +179,7 @@ def extrair_folha_analitica(pdf_path):
                             continue
 
                         evento_match = re.match(
-                            r"(\d{3})\s+(.+?)\s+([\d,]+)?\s+([\d.,]+)",
+                            r"(\\d{3})\\s+(.+?)\\s+([\\d,]+)?\\s+([\\d.,]+)",
                             parte
                         )
 
@@ -254,7 +280,7 @@ def processar_pdf(file):
                 "vlr_medico": round(vlr_med, 2),
                 "vlr_odonto": round(vlr_odo, 2),
                 "vlr_copart": 0,
-                "total": round(vlr_med + vlr_odo, 2)
+                "total": round(vlr_med + vlr_odonto, 2)
             })
 
     df_totvs = pd.DataFrame(linhas)
@@ -302,7 +328,7 @@ def processar_pdf(file):
     return final, df_totvs
 
 # -------------------------------
-# UPLOAD CARD
+# UPLOAD CARD 💖
 # -------------------------------
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.subheader("💌 Envie seus PDFs")
@@ -316,7 +342,7 @@ uploaded_files = st.file_uploader(
 st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------
-# ARQUIVOS
+# PROCESSAMENTO DOS ARQUIVOS 💖
 # -------------------------------
 if uploaded_files:
 
@@ -325,41 +351,38 @@ if uploaded_files:
 
     for file in uploaded_files:
 
-        col1, col2, col3 = st.columns([4,1,1])
+        col1, col2, col3 = st.columns([4, 1, 1])
 
-        col1.write(file.name)
-
-        if col2.button("Processar", key=file.name):
-
-            status = st.empty()
-            status.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
-
-            resultado, df_totvs = processar_pdf(file)
-
-            status.success("Prontinho, meu amor 💚")
-
-            st.session_state.arquivos_processados[file.name] = resultado
-
+        # Marcar arquivos já processados
         if file.name in st.session_state.arquivos_processados:
-
+            col1.markdown(f"✅ {file.name}")
+            col2.button("Processar", key=file.name, disabled=True)
             col3.download_button(
                 "Baixar",
                 st.session_state.arquivos_processados[file.name],
-                file_name=file.name.replace(".pdf", ".xlsx")
+                file_name=file.name.replace(".pdf", ".xlsx"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+        else:
+            col1.write(file.name)
+            if col2.button("Processar", key=file.name):
+                status_p = st.empty()
+                status_p.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+
+                resultado, df_totvs = processar_pdf(file)
+
+                status_p.success("Prontinho, meu amor 💚")
+
+                st.session_state.arquivos_processados[file.name] = resultado
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------
-# HISTÓRICO
+# HISTÓRICO (em expander) 💖
 # -------------------------------
-if st.session_state.historico:
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("📊 Histórico")
-
-    df_hist = pd.DataFrame(st.session_state.historico)
-    st.dataframe(df_hist, use_container_width=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
+with st.expander("📋 Histórico de processamentos"):
+    if st.session_state.historico:
+        df_hist = pd.DataFrame(st.session_state.historico)
+        st.dataframe(df_hist, use_container_width=True)
+    else:
+        st.caption("Ainda não há processamentos.")
