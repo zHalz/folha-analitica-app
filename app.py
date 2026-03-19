@@ -466,7 +466,7 @@ def processar_pdf(file, status_container, progress_bar):
 col_process, col_hist = st.columns([2, 1], gap="medium")
 
 # -------------------------------
-# COLUNA ESQUERDA – PROCESSAMENTO COM PROGRESSO E "CAIXAS" POR ARQUIVO 💖
+# COLUNA ESQUERDA – PROCESSAMENTO COM CAIXA POR ARQUIVO 💖
 # -------------------------------
 with col_process:
 
@@ -482,37 +482,39 @@ with col_process:
     if uploaded_files:
 
         for file in uploaded_files:
-            # Envolve cada arquivo em uma "caixa" suave com hover
-            st.markdown('<div class="file-row">', unsafe_allow_html=True)
 
-            aux_cols = st.columns([4, 1, 1])
+            # CAIXA POR ARQUIVO – tudo dentro
+            st.markdown('<div class="file-block">', unsafe_allow_html=True)
+
+            # fila 1: nome / processar / baixar
+            cols = st.columns([4, 1, 1], gap="small")
+            nome_col = cols[0]
+            proc_col = cols[1]
+            down_col = cols[2]
 
             if file.name in st.session_state.arquivos_processados:
-                # já processado: botão desabilitado + download
-                aux_cols[0].markdown(f"✅ <span style='color: #79c0ff;'>{file.name}</span>", unsafe_allow_html=True)
-                aux_cols[1].button("Processar", key=file.name, disabled=True)
-
-                # botão de download
-                aux_cols[2].download_button(
+                nome_col.markdown(f"✅ <span style='color:#79c0ff;font-weight:500;'>{file.name}</span>", unsafe_allow_html=True)
+                proc_col.button("Processar", key=f"proc_{file.name}", disabled=True)
+                down_col.download_button(
                     "Baixar",
                     st.session_state.arquivos_processados[file.name]["file"],
                     file_name=file.name.replace(".pdf", ".xlsx"),
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"download_{file.name}"
+                    key=f"down_{file.name}"
                 )
 
-                # mostra resumo do arquivo já processado
-                resumo = st.session_state.arquivos_processados[file.name]["resumo"]
-                st.caption(
-                    f"📊 Registros: {resumo['registros_extraidos'][0]:,} · "
-                    f"👥 Colaboradores: {resumo['colaboradores'][0]:,}"
-                )
+                # linha de resumo
+                resumo = st.session_state.arquivos_processados[file.name].get("resumo", None)
+                if resumo is not None:
+                    st.caption(
+                        f"📊 Registros: {resumo['registros_extraidos'][0]:,} · "
+                        f"👥 Colaboradores: {resumo['colaboradores'][0]:,}"
+                    )
 
             else:
-                # novo arquivo
-                aux_cols[0].markdown(f"📎 <span style='color: #adbac7;'>{file.name}</span>", unsafe_allow_html=True)
+                nome_col.markdown(f"📎 <span style='color:#adbac7;font-weight:500;'>{file.name}</span>", unsafe_allow_html=True)
 
-                if aux_cols[1].button("Processar", key=file.name):
+                if proc_col.button("Processar", key=f"proc_{file.name}"):
                     status_container = st.empty()
                     progress_bar = st.progress(0)
 
@@ -528,13 +530,11 @@ with col_process:
                             progress_bar.empty()
                             status_container.success("✅ Processamento concluído! Prontinho, meu amor 💚")
 
-                            # armazena o arquivo Excel + resumo
                             st.session_state.arquivos_processados[file.name] = {
                                 "file": excel_final,
                                 "resumo": resumo
                             }
 
-                            # adiciona ao histórico global
                             st.session_state.historico.append({
                                 "arquivo": file.name,
                                 "data": resumo["data"][0],
@@ -542,7 +542,6 @@ with col_process:
                                 "colaboradores": resumo["colaboradores"][0]
                             })
 
-                            # recarrega o app para mostrar o botão de download imediatamente
                             st.rerun()
 
                     except Exception as e:
@@ -552,7 +551,7 @@ with col_process:
             st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------
-# COLUNA DIREITA – HISTÓRICO
+# COLUNA DIREITA – HISTÓRICO MELHORADO 💖
 # -------------------------------
 with col_hist:
 
@@ -568,10 +567,9 @@ with col_hist:
             column_config={
                 "data": "Data",
                 "arquivo": "Arquivo",
-                "registros": st.column_config.NumberColumn("Registros", format="%d"),
-                "colaboradores": st.column_config.NumberColumn("Colaboradores", format="%d")
+                "registros": st.column_config.NumberColumn("Registros", format="%,d"),
+                "colaboradores": st.column_config.NumberColumn("Colaboradores", format="%,d")
             }
         )
     else:
         st.caption("Ainda não há processamentos.")
-
