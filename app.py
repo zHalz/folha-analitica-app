@@ -232,20 +232,31 @@ def processar_pdf(file):
     wb = load_workbook(buffer)
     ws = wb["Base_TOTVS"]
 
-    ultima = ws.max_row
+    ultima_linha = ws.max_row
 
-    linha_tit = ultima + 2
-    linha_dep = ultima + 3
+    linha_titular = ultima_linha + 2
+    linha_dependente = ultima_linha + 3
 
-    ws[f"D{linha_tit}"] = "TITULAR"
-    ws[f"D{linha_dep}"] = "DEPENDENTE"
+    ws[f"D{linha_titular}"] = "TITULAR"
+    ws[f"D{linha_dependente}"] = "DEPENDENTE"
 
-    linha_inicio = 2
-    linha_fim = ultima
+    range_e = f"E2:E{ultima_linha}"
+    range_f = f"F2:F{ultima_linha}"
+    range_g = f"G2:G{ultima_linha}"
+    range_h = f"H2:H{ultima_linha}"
+    range_c = f"C2:C{ultima_linha}"
 
-    for col in ["E", "F", "G", "H"]:
-        ws[f"{col}{linha_tit}"] = f'=SOMASE(C{linha_inicio}:C{linha_fim};"TITULAR";{col}{linha_inicio}:{col}{linha_fim})'
-        ws[f"{col}{linha_dep}"] = f'=SOMASE(C{linha_inicio}:C{linha_fim};"DEPENDENTE";{col}{linha_inicio}:{col}{linha_fim})'
+    # TITULAR
+    ws[f"E{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_titular})+0)'
+    ws[f"F{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_titular})+0)'
+    ws[f"G{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_titular})+0)'
+    ws[f"H{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_titular})+0)'
+
+    # DEPENDENTE
+    ws[f"E{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_dependente})+0)'
+    ws[f"F{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_dependente})+0)'
+    ws[f"G{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_dependente})+0)'
+    ws[f"H{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_dependente})+0)'
 
     final = BytesIO()
     wb.save(final)
