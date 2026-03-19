@@ -34,7 +34,7 @@ st.markdown("""
 # -------------------------------
 # TÍTULO
 # -------------------------------
-st.title("📄 Processador de Folha Analítica pra minha namorada (Karem 💍♥️)")
+st.title("📄 Processador de Folha Analítica pra minha preta (Karem 💍♥️)")
 st.caption("Mor, envie o PDF e receba o Excel pronto para importação")
 
 # -------------------------------
