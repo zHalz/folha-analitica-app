@@ -10,7 +10,7 @@ from openpyxl import load_workbook
 st.set_page_config(page_title="Folha Analítica", layout="centered")
 
 # -------------------------------
-# ESTILO MINIMALISTA + PREMIUM
+# ESTILO FINAL (FIX VISUAL)
 # -------------------------------
 st.markdown("""
 <style>
@@ -19,11 +19,16 @@ st.markdown("""
         max-width: 700px;
     }
 
-    .stFileUploader {
-        border: 2px dashed #dcdcdc;
+    /* FIX UPLOADER */
+    section[data-testid="stFileUploader"] {
+        background-color: #1e1e1e;
         padding: 1.5rem;
         border-radius: 12px;
-        background-color: #fafafa;
+        border: 1px solid #333;
+    }
+
+    section[data-testid="stFileUploader"] * {
+        color: white !important;
     }
 
     .stButton>button {
@@ -42,13 +47,6 @@ st.markdown("""
         height: 2.5em;
         font-weight: 600;
         border: none;
-    }
-
-    .card {
-        padding: 0.8rem;
-        border-radius: 10px;
-        background-color: #f8f9fa;
-        margin-bottom: 0.8rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -263,8 +261,17 @@ def processar_pdf(file):
     range_h = f"H2:H{ultima_linha}"
     range_c = f"C2:C{ultima_linha}"
 
+    # TITULAR
     ws[f"E{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_titular})+0)'
+    ws[f"F{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_titular})+0)'
+    ws[f"G{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_titular})+0)'
+    ws[f"H{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_titular})+0)'
+
+    # DEPENDENTE
     ws[f"E{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_dependente})+0)'
+    ws[f"F{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_dependente})+0)'
+    ws[f"G{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_dependente})+0)'
+    ws[f"H{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_dependente})+0)'
 
     final = BytesIO()
     wb.save(final)
@@ -280,13 +287,12 @@ def processar_pdf_cache(file_bytes):
     return processar_pdf(BytesIO(file_bytes))
 
 # -------------------------------
-# UPLOAD (LIMPO)
+# UPLOAD
 # -------------------------------
 uploaded_files = st.file_uploader(
     "💌 Arrasta aqui os PDFs, amor",
     type=["pdf"],
-    accept_multiple_files=True,
-    label_visibility="collapsed"
+    accept_multiple_files=True
 )
 
 # -------------------------------
@@ -329,5 +335,4 @@ if st.session_state.historico:
     st.subheader("📊 Histórico")
 
     df_hist = pd.DataFrame(st.session_state.historico)
-
     st.dataframe(df_hist, use_container_width=True)
