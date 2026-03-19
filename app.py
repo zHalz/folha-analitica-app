@@ -483,6 +483,7 @@ with col_process:
                         excel_final, resumo = processar_pdf(file, status_container, progress_bar)
 
                         if excel_final is None:
+                            progress_bar.empty()
                             status_container.error("⚠️ Não foi possível extrair dados desse PDF.")
                         else:
                             progress_bar.empty()
@@ -501,6 +502,9 @@ with col_process:
                                 "registros": resumo["registros_extraidos"][0],
                                 "colaboradores": resumo["colaboradores"][0]
                             })
+
+                            # força recarregar para mostrar o botão de download imediatamente
+                            st.rerun()
 
                     except Exception as e:
                         progress_bar.empty()
