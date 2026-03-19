@@ -10,7 +10,7 @@ import time
 st.set_page_config(page_title="Folha Analítica", layout="wide")
 
 # -------------------------------
-# CSS MODERNO DARK E FLUIDO 💖
+# CSS MODERNO DARK (AJUSTADO PARA TÍTULO NÃO CORTAR) 💖
 # -------------------------------
 st.markdown("""
 <style>
@@ -31,27 +31,29 @@ body {
 
 .block-container {
     min-height: 100vh;
-    padding-top: 1rem;
+    padding-top: 1.2rem;
     padding-bottom: 1rem;
 }
 
-h1, h2, h3 {
-    color: white;
-}
-
+/* Ajuste: título não corta e quebra bem */
 .hero {
     text-align: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
+    padding: 1rem 0.5rem 0;
 }
 .hero h1 {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     font-weight: 600;
+    margin: 0;
+    line-height: 1.2;
 }
 .hero p {
     color: var(--secondary-text);
-    font-size: 1.1rem;
+    font-size: 1.05rem;
+    margin-top: 0.5rem;
 }
 
+/* Botão de ação */
 .stButton>button {
     background: linear-gradient(90deg, var(--accent-start), var(--accent-end));
     color: white;
@@ -59,7 +61,7 @@ h1, h2, h3 {
     height: 2.6em;
     border: none;
     font-weight: 500;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .stButton>button:hover {
     transform: translateY(-1px);
@@ -71,19 +73,21 @@ h1, h2, h3 {
     cursor: not-allowed;
 }
 
+/* Botão de download */
 .stDownloadButton>button {
     background-color: var(--success) !important;
     border-radius: 8px;
     height: 2.6em;
     border: none;
     font-weight: 500;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .stDownloadButton>button:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(36, 161, 72, 0.3);
 }
 
+/* Tabela de histórico */
 .stDataFrame {
     border-radius: 8px;
     overflow: hidden;
@@ -431,7 +435,7 @@ def processar_pdf(file, status_container, progress_bar):
 col_process, col_hist = st.columns([2, 1], gap="medium")
 
 # -------------------------------
-# COLUNA ESQUERDA – PROCESSAMENTO COM PROGRESSO 💖
+# COLUNA ESQUERDA – PROCESSAMENTO COM PROGRESSO E POP‑UP TEMPORÁRIO 💖
 # -------------------------------
 with col_process:
 
@@ -478,6 +482,7 @@ with col_process:
                     status_container = st.empty()
                     progress_bar = st.progress(0)
 
+                    # 1. mostra a mensagem de início e mantém até o processamento terminar
                     status_container.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
                     try:
@@ -488,7 +493,7 @@ with col_process:
                             status_container.error("⚠️ Não foi possível extrair dados desse PDF.")
                         else:
                             progress_bar.empty()
-                            # substitui a mensagem de info por sucesso
+                            # 2. substitui por mensagem de sucesso
                             status_container.success("✅ Processamento concluído! Prontinho, meu amor 💚")
 
                             # armazena o arquivo Excel + resumo
@@ -505,21 +510,14 @@ with col_process:
                                 "colaboradores": resumo["colaboradores"][0]
                             })
 
-                            # recarregar o app para mostrar o download imediatamente
+                            # 3. recarrega após 7s para fazer a mensagem de sucesso sumir
+                            import time
+                            time.sleep(7)
                             st.rerun()
 
                     except Exception as e:
                         progress_bar.empty()
                         status_container.error(f"❌ Erro ao processar: {str(e)}")
-
-                    # Agora, se a mensagem de sucesso foi exibida, ela fica por 7s e depois some
-                    # (Streamlit não permite “sumir sozinho” sem recarregar, então vamos recarregar após 7s)
-                    if "status_mostrado_por_7s" in st.session_state and st.session_state.status_mostrado_por_7s == file.name:
-                        time.sleep(7)
-                        st.session_state.status_mostrado_por_7s = None
-                        st.rerun()
-                    elif excel_final is not None:
-                        st.session_state.status_mostrado_por_7s = file.name
 
 # -------------------------------
 # COLUNA DIREITA – HISTÓRICO
