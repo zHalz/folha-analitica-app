@@ -428,4 +428,91 @@ with col_process:
 
     st.markdown('<div class="section-title"><h2>💌 Processamento dos PDFs</h2></div>', unsafe_allow_html=True)
 
-    uploaded_files = st.file
+        uploaded_files = st.file_uploader(
+        "Arraste seus PDFs aqui",
+        type=["pdf"],
+        accept_multiple_files=True,
+        label_visibility="collapsed"
+    )
+
+    if uploaded_files:
+
+        for file in uploaded_files:
+            aux_cols = st.columns([4, 1, 1])
+
+            if file.name in st.session_state.arquivos_processados:
+                # já processado: botão desabilitado + download
+                aux_cols[0].markdown(f"✅ {file.name}")
+                aux_cols[1].button("Processar", key=file.name, disabled=True)
+                aux_cols[2].download_button(
+                    "Baixar",
+                    st.session_state.arquivos_processados[file.name]["file"],
+                    file_name=file.name.replace(".pdf", ".xlsx"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+                # mostra resumo do arquivo já processado
+                resumo = st.session_state.arquivos_processados[file.name]["resumo"]
+                st.caption(
+                    f"📊 Registros: {resumo['registros_extraidos'][0]:,} · "
+                    f"👥 Colaboradores: {resumo['colaboradores'][0]:,}"
+                )
+
+            else:
+                # novo arquivo
+                aux_cols[0].markdown(f"📎 {file.name}")
+
+                if aux_cols[1].button("Processar", key=file.name):
+                    status_p = st.empty()
+                    status_p.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+
+                    try:
+                        excel_final, resumo = processar_pdf(file)
+
+                        if excel_final is None:
+                            status_p.error("⚠️ Não foi possível extrair dados desse PDF.")
+                        else:
+                            status_p.success("Prontinho, meu amor 💚")
+
+                            # armazena no session_state: arquivo Excel + resumo
+                            st.session_state.arquivos_processados[file.name] = {
+                                "file": excel_final,
+                                "resumo": resumo
+                            }
+
+                            # adiciona ao histórico global
+                            st.session_state.historico.append({
+                                "arquivo": file.name,
+                                "data": resumo["data"][0],
+                                "registros": resumo["registros_extraidos"][0],
+                                "colaboradores": resumo["colaboradores"][0]
+                            })
+
+                    except Exception as e:
+                        status_p.error(f"❌ Erro ao processar: {str(e)}")
+
+
+# -------------------------------
+# COLUNA DIREITA – HISTÓRICO
+# -------------------------------
+with col_hist:
+
+    st.markdown('<div class="section-title"><h2>📋 Histórico de Processamentos</h2></div>', unsafe_allow_html=True)
+
+    if st.session_state.historico:
+        df_hist = pd.DataFrame(st.session_state.historico)
+        df_hist = df_hist.sort_values(by="data", ascending=False).reset_index(drop=True)
+
+        st.dataframe(
+            df_hist,
+            use_container_width=True,
+            column_config={
+                "data": "Data",
+                "arquivo": "Arquivo",
+                "registros": st.column_config.NumberColumn("Registros", format="%d"),
+                "colaboradores": st.column_config.NumberColumn("Colaboradores", format="%d")
+            }
+        )
+    else:
+        st.caption("Ainda não há processamentos.")
+
