@@ -105,7 +105,7 @@ body {
 # -------------------------------
 st.markdown("""
 <div class="hero">
-    <h1>📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)</h1>
+    <h1>📄 Processador de Folha Analítica pra Minha Preta (Karem 💍🦅🖤🤍)</h1>
     <p>Mor, envia aqui que eu resolvo tudo pra você rapidinho 😘</p>
 </div>
 """, unsafe_allow_html=True)
@@ -494,7 +494,7 @@ with col_process:
                         else:
                             progress_bar.empty()
                             # 2. substitui por mensagem de sucesso
-                            status_container.success("✅ Processamento concluído! Prontinho, meu amor 💚")
+                            status_container.success("✅ Processamento concluído! Prontinho, meu amor 🦅🖤🤍")
 
                             # armazena o arquivo Excel + resumo
                             st.session_state.arquivos_processados[file.name] = {
