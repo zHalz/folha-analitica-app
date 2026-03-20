@@ -105,7 +105,7 @@ body {
 # -------------------------------
 st.markdown("""
 <div class="hero">
-    <h1>📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️</h1>
+    <h1>📄 Processador de Folha Analítica pra Minha Preta (Karem 💍♥️)</h1>
     <p>Mor, envia aqui que eu resolvo tudo pra você rapidinho 😘</p>
 </div>
 """, unsafe_allow_html=True)
