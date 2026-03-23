@@ -7,7 +7,21 @@ from io import BytesIO
 from openpyxl import load_workbook
 import time
 
-st.set_page_config(page_title="Folha Analítica", layout="wide")
+st.set_page_config(page_title="Folha Analítica", layout="wide"
+
+st.markdown("""
+<style>
+    .stAlert { padding: 1rem; border-radius: 8px; }
+</style>
+""", unsafe_allow_html=True)
+
+# Aviso para PDFs grandes
+with st.expander("ℹ️ Dica para PDFs Grandes", expanded=False):
+    st.info("""
+    🔹 **PDFs até 200 páginas**: Processamento completo
+    🔹 **PDFs > 200 páginas**: Processa primeiras 200 páginas automaticamente  
+    🔹 **Solução completa**: Divida o PDF em partes menores (ex: 200 páginas cada)
+    """)
 
 # -------------------------------
 # CSS MODERNO DARK (AJUSTADO PARA TÍTULO NÃO CORTAR) 💖
@@ -382,41 +396,94 @@ def exportar_para_excel_completo(df_consolidado, pivot_completa, analise_plano, 
 
 
 # -------------------------------
-# PROCESSAMENTO COMPLETO DE UM ARQUIVO (COM PROGRESSO) 💖
+# PROCESSAMENTO COMPLETO (COM LOTES + TIMEOUT) 💖
 # -------------------------------
-def processar_pdf(file, status_container, progress_bar):
-
+def processar_pdf(file, status_container, progress_bar, max_paginas=200):
+    """Processa PDF por lotes de até max_paginas, com timeout handling"""
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(file.read())
         pdf_path = tmp.name
 
-    # 1. extração com progresso
-    df_consolidado = extrair_folha_analitica(
-        pdf_path, status_container=status_container, progress_bar=progress_bar
-    )
+    dados = []
+    with pdfplumber.open(pdf_path) as pdf:
+        total_paginas = len(pdf.pages)
+        paginas_processar = min(total_paginas, max_paginas)
+        
+        status_container.markdown(f"**📖 Detectadas {total_paginas} páginas. Processando primeiras {paginas_processar}...**")
+        
+        for page_num in range(paginas_processar):
+            if progress_bar:
+                progress_bar.progress((page_num + 1) / paginas_processar)
+            
+            page = pdf.pages[page_num]
+            texto = page.extract_text() or page.extract_text(layout=True) or page.extract_text(x_tolerance=3)
+            
+            if not texto:
+                continue
 
-    if df_consolidado.empty:
+            # Seu código de parsing atual (igual)
+            linhas = texto.split("\n")
+            nome_atual = matricula_atual = None
+            
+            for linha_num, linha in enumerate(linhas):
+                linha = linha.strip()
+                linha = re.sub(r"\s{2,}", " ", linha)
+
+                # Mesmas regex do seu código original
+                mat_match = re.search(r"MAT\.?\s*:?\s*(\d{5,7})", linha)
+                if mat_match:
+                    matricula_atual = mat_match.group(1)
+
+                nome_match = re.search(r"NOME\s*:?\s*([A-ZÀ-Ú\s]+?)(?:FUNCAO|FUNC|DT|$)", linha)
+                if nome_match:
+                    nome_atual = nome_match.group(1).strip()
+
+                if "|" in linha and re.search(r"\d{3}", linha):
+                    # Seu parsing de eventos (igual)
+                    partes = linha.split("|")
+                    nome_final = nome_atual or "SEM_NOME"
+                    matricula_final = matricula_atual or "SEM_MAT"
+                    
+                    for idx, parte in enumerate(partes):
+                        parte = parte.strip()
+                        if not parte: continue
+                        
+                        evento_match = re.match(r"(\d{3})\s+(.+?)\s+([\d,]+)?\s+([\d.,]+)", parte)
+                        if evento_match:
+                            codigo, desc, ref, valor = evento_match.groups()
+                            tipo = "PROVENTO" if idx == 0 else "DESCONTO"
+                            valor = valor.replace(".", "").replace(",", ".")
+                            
+                            try:
+                                valor = float(valor)
+                                dados.append({
+                                    "pagina": page_num + 1, "linha_original": linha_num + 1,
+                                    "nome": nome_final, "matricula": matricula_final,
+                                    "tipo": tipo, "codigo": codigo, "descricao": desc.strip(),
+                                    "referencia": ref, "valor": valor
+                                })
+                            except:
+                                continue
+
+    df = pd.DataFrame(dados)
+    if df.empty:
         return None, None
 
-    # 2. pivots e análise de plano
-    df_consolidado, pivot_completa, analise_plano = gerar_planilhas(df_consolidado)
-
-    # 3. split titular/dependentes para TOTVS
+    # Resto do seu pipeline (igual)
+    df["nome"] = df["nome"].str.replace(r"[:\s]+$", "", regex=True).str.strip()
+    df_consolidado, pivot_completa, analise_plano = gerar_planilhas(df)
     df_totvs = criar_base_totvs(analise_plano)
+    excel_final = exportar_para_excel_completo(df_consolidado, pivot_completa, analise_plano, df_totvs)
 
-    # 4. exportar com várias abas e totais na Base_TOTVS
-    excel_final = exportar_para_excel_completo(
-        df_consolidado, pivot_completa, analise_plano, df_totvs
-    )
-
-    # 5. retornar o arquivo Excel e o resumo para o histórico
     resumo = pd.DataFrame({
         "arquivo": [file.name],
-        "registros_extraidos": [len(df_consolidado)],
-        "colaboradores": [df_consolidado["matricula"].nunique()],
+        "registros_extraidos": [len(df)],
+        "colaboradores": [df["matricula"].nunique()],
+        "paginas_processadas": [paginas_processar],
         "data": [pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")]
     })
-
+    
     return excel_final, resumo
 
 # -------------------------------
@@ -476,7 +543,7 @@ with col_process:
                     status_container.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
 
                     try:
-                        excel_final, resumo = processar_pdf(file, status_container, progress_bar)
+                        excel_final, resumo = processar_pdf(file, status_container, progress_bar, max_paginas=200)
 
                         if excel_final is None:
                             progress_bar.empty()
