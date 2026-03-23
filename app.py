@@ -396,94 +396,122 @@ def exportar_para_excel_completo(df_consolidado, pivot_completa, analise_plano, 
 
 
 # -------------------------------
-# PROCESSAMENTO COMPLETO (COM LOTES + TIMEOUT) 💖
+# PROCESSAMENTO COMPLETO - TODAS AS PÁGINAS (LOTES AUTOMÁTICOS) 💖
 # -------------------------------
-def processar_pdf(file, status_container, progress_bar, max_paginas=200):
-    """Processa PDF por lotes de até max_paginas, com timeout handling"""
+def processar_pdf_completo(file, status_container, progress_bar):
+    """Processa PDF COMPLETO em lotes de 100 páginas automaticamente"""
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(file.read())
         pdf_path = tmp.name
 
     dados = []
+    TODAS_DADOS = []
+    
     with pdfplumber.open(pdf_path) as pdf:
         total_paginas = len(pdf.pages)
-        paginas_processar = min(total_paginas, max_paginas)
+        lote_tamanho = 100  # Lote otimizado pro Streamlit Cloud
+        lotes_totais = (total_paginas + lote_tamanho - 1) // lote_tamanho
         
-        status_container.markdown(f"**📖 Detectadas {total_paginas} páginas. Processando primeiras {paginas_processar}...**")
+        status_container.markdown(f"**📖 {total_paginas} páginas detectadas. Processando {lotes_totais} lotes de {lote_tamanho}...**")
         
-        for page_num in range(paginas_processar):
-            if progress_bar:
-                progress_bar.progress((page_num + 1) / paginas_processar)
+        for lote_idx in range(lotes_totais):
+            inicio = lote_idx * lote_tamanho
+            fim = min((lote_idx + 1) * lote_tamanho, total_paginas)
             
-            page = pdf.pages[page_num]
-            texto = page.extract_text() or page.extract_text(layout=True) or page.extract_text(x_tolerance=3)
+            status_container.markdown(f"**🔄 Lote {lote_idx+1}/{lotes_totais} (páginas {inicio+1}-{fim})**")
             
-            if not texto:
-                continue
+            # Processa lote atual
+            for page_num in range(inicio, fim):
+                if progress_bar:
+                    progress_bar.progress((page_num + 1) / total_paginas)
+                
+                page = pdf.pages[page_num]
+                texto = (page.extract_text() or 
+                        page.extract_text(layout=True) or 
+                        page.extract_text(x_tolerance=3))
+                
+                if not texto: continue
 
-            # Seu código de parsing atual (igual)
-            linhas = texto.split("\n")
-            nome_atual = matricula_atual = None
-            
-            for linha_num, linha in enumerate(linhas):
-                linha = linha.strip()
-                linha = re.sub(r"\s{2,}", " ", linha)
+                linhas = texto.split("\n")
+                nome_atual = matricula_atual = None
+                
+                for linha_num, linha in enumerate(linhas):
+                    linha = linha.strip()
+                    linha = re.sub(r"\s{2,}", " ", linha)
 
-                # Mesmas regex do seu código original
-                mat_match = re.search(r"MAT\.?\s*:?\s*(\d{5,7})", linha)
-                if mat_match:
-                    matricula_atual = mat_match.group(1)
+                    # Suas regex originais
+                    mat_match = re.search(r"MAT\.?\s*:?\s*(\d{5,7})", linha)
+                    if mat_match:
+                        matricula_atual = mat_match.group(1)
 
-                nome_match = re.search(r"NOME\s*:?\s*([A-ZÀ-Ú\s]+?)(?:FUNCAO|FUNC|DT|$)", linha)
-                if nome_match:
-                    nome_atual = nome_match.group(1).strip()
+                    nome_match = re.search(
+                        r"NOME\s*:?\s*([A-ZÀ-Ú\s]+?)(?:FUNCAO|FUNC|DT|$)", 
+                        linha
+                    )
+                    if nome_match:
+                        nome_atual = nome_match.group(1).strip()
 
-                if "|" in linha and re.search(r"\d{3}", linha):
-                    # Seu parsing de eventos (igual)
-                    partes = linha.split("|")
-                    nome_final = nome_atual or "SEM_NOME"
-                    matricula_final = matricula_atual or "SEM_MAT"
-                    
-                    for idx, parte in enumerate(partes):
-                        parte = parte.strip()
-                        if not parte: continue
+                    if "|" in linha and re.search(r"\d{3}", linha):
+                        partes = linha.split("|")
+                        nome_final = nome_atual or "SEM_NOME"
+                        matricula_final = matricula_atual or "SEM_MAT"
                         
-                        evento_match = re.match(r"(\d{3})\s+(.+?)\s+([\d,]+)?\s+([\d.,]+)", parte)
-                        if evento_match:
-                            codigo, desc, ref, valor = evento_match.groups()
-                            tipo = "PROVENTO" if idx == 0 else "DESCONTO"
-                            valor = valor.replace(".", "").replace(",", ".")
+                        for idx, parte in enumerate(partes):
+                            parte = parte.strip()
+                            if not parte: continue
                             
-                            try:
-                                valor = float(valor)
-                                dados.append({
-                                    "pagina": page_num + 1, "linha_original": linha_num + 1,
-                                    "nome": nome_final, "matricula": matricula_final,
-                                    "tipo": tipo, "codigo": codigo, "descricao": desc.strip(),
-                                    "referencia": ref, "valor": valor
-                                })
-                            except:
-                                continue
+                            evento_match = re.match(
+                                r"(\d{3})\s+(.+?)\s+([\d,]+)?\s+([\d.,]+)", 
+                                parte
+                            )
+                            if evento_match:
+                                codigo, desc, ref, valor = evento_match.groups()
+                                tipo = "PROVENTO" if idx == 0 else "DESCONTO"
+                                
+                                valor = valor.replace(".", "").replace(",", ".")
+                                try:
+                                    valor = float(valor)
+                                    TODAS_DADOS.append({
+                                        "pagina": page_num + 1,
+                                        "linha_original": linha_num + 1,
+                                        "nome": nome_final,
+                                        "matricula": matricula_final,
+                                        "tipo": tipo,
+                                        "codigo": codigo,
+                                        "descricao": desc.strip(),
+                                        "referencia": ref,
+                                        "valor": valor
+                                    })
+                                except ValueError:
+                                    continue
 
-    df = pd.DataFrame(dados)
-    if df.empty:
+    if not TODAS_DADOS:
         return None, None
 
-    # Resto do seu pipeline (igual)
-    df["nome"] = df["nome"].str.replace(r"[:\s]+$", "", regex=True).str.strip()
-    df_consolidado, pivot_completa, analise_plano = gerar_planilhas(df)
+    # ✅ CONSOLIDA TODOS OS DADOS
+    df_consolidado = pd.DataFrame(TODAS_DADOS)
+    df_consolidado["nome"] = (
+        df_consolidado["nome"]
+        .str.replace(r"[:\s]+$", "", regex=True)
+        .str.strip()
+    )
+
+    status_container.markdown("**📊 Consolidando dados e gerando planilhas...**")
+    
+    # Seu pipeline original
+    _, pivot_completa, analise_plano = gerar_planilhas(df_consolidado)
     df_totvs = criar_base_totvs(analise_plano)
     excel_final = exportar_para_excel_completo(df_consolidado, pivot_completa, analise_plano, df_totvs)
 
     resumo = pd.DataFrame({
         "arquivo": [file.name],
-        "registros_extraidos": [len(df)],
-        "colaboradores": [df["matricula"].nunique()],
-        "paginas_processadas": [paginas_processar],
+        "registros_extraidos": [len(df_consolidado)],
+        "colaboradores": [df_consolidado["matricula"].nunique()],
+        "paginas_processadas": [total_paginas],
         "data": [pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")]
     })
-    
+
     return excel_final, resumo
 
 # -------------------------------
@@ -540,10 +568,10 @@ with col_process:
                     progress_bar = st.progress(0)
 
                     # 1. mostra a mensagem de início e mantém até o processamento terminar
-                    status_container.info("🔄 Iniciando processamento... (preta, tenha um pouco de paciência 😂♥️)")
+                    status_container.info("🔄 Processando PDF COMPLETO (todas as páginas em lotes)...")
 
                     try:
-                        excel_final, resumo = processar_pdf(file, status_container, progress_bar, max_paginas=200)
+                        excel_final, resumo = processar_pdf_completo(file, status_container, progress_bar)
 
                         if excel_final is None:
                             progress_bar.empty()
