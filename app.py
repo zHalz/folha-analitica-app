@@ -520,7 +520,7 @@ with col_hist:
 
         st.dataframe(
             df_hist,
-            use_container_width=True,
+            width="stretch",  # ✅ Streamlit 1.55+ compatível
             column_config={
                 "data": "Data",
                 "arquivo": "Arquivo",
@@ -530,3 +530,4 @@ with col_hist:
         )
     else:
         st.caption("Ainda não há processamentos.")
+
