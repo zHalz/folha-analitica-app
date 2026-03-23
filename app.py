@@ -7,7 +7,7 @@ from io import BytesIO
 from openpyxl import load_workbook
 import time
 
-st.set_page_config(page_title="Folha Analítica", layout="wide"
+st.set_page_config(page_title="Folha Analítica", layout="wide")  # ✅ Parênteses fechado!
 
 st.markdown("""
 <style>
