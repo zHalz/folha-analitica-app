@@ -346,9 +346,7 @@ def criar_base_totvs(analise_plano):
 # EXPORTAÇÃO COMPLETA (múltiplas abas)
 # -------------------------------
 def exportar_para_excel_completo(df_consolidado, pivot_completa, analise_plano, df_totvs):
-
     buffer = BytesIO()
-
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df_consolidado.to_excel(writer, sheet_name="Detalhamento", index=False)
         pivot_completa.to_excel(writer, sheet_name="Pivot_Eventos", index=False)
@@ -356,10 +354,8 @@ def exportar_para_excel_completo(df_consolidado, pivot_completa, analise_plano, 
         df_totvs.to_excel(writer, sheet_name="Base_TOTVS", index=False)
 
     buffer.seek(0)
-
     wb = load_workbook(buffer)
     ws = wb["Base_TOTVS"]
-
     ultima_linha = ws.max_row
 
     linha_titular = ultima_linha + 2
@@ -368,26 +364,20 @@ def exportar_para_excel_completo(df_consolidado, pivot_completa, analise_plano, 
     ws[f"D{linha_titular}"] = "TITULAR"
     ws[f"D{linha_dependente}"] = "DEPENDENTE"
 
-    range_e = f"E2:E{ultima_linha}"
-    range_f = f"F2:F{ultima_linha}"
-    range_g = f"G2:G{ultima_linha}"
-    range_h = f"H2:H{ultima_linha}"
-    range_c = f"C2:C{ultima_linha}"
+    # Fórmulas corrigidas SEM interpolação de range strings
+    ws[f"E{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW(E2:E{ultima_linha})-ROW(E2),0)),(C2:C{ultima_linha}=D{linha_titular})+0)'
+    ws[f"F{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW(F2:F{ultima_linha})-ROW(F2),0)),(C2:C{ultima_linha}=D{linha_titular})+0)'
+    ws[f"G{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW(G2:G{ultima_linha})-ROW(G2),0)),(C2:C{ultima_linha}=D{linha_titular})+0)'
+    ws[f"H{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW(H2:H{ultima_linha})-ROW(H2),0)),(C2:C{ultima_linha}=D{linha_titular})+0)'
 
-    ws[f"E{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_titular})+0)'
-    ws[f"F{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_titular})+0)'
-    ws[f"G{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_titular})+0)'
-    ws[f"H{linha_titular}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_titular})+0)'
-
-    ws[f"E{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW({range_e})-ROW(E2),0)),({range_c}=D{linha_dependente})+0)'
-    ws[f"F{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW({range_f})-ROW(F2),0)),({range_c}=D{linha_dependente})+0)'
-    ws[f"G{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW({range_g})-ROW(G2),0)),({range_c}=D{linha_dependente})+0)'
-    ws[f"H{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW({range_h})-ROW(H2),0)),({range_c}=D{linha_dependente})+0)'
+    ws[f"E{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(E2,ROW(E2:E{ultima_linha})-ROW(E2),0)),(C2:C{ultima_linha}=D{linha_dependente})+0)'
+    ws[f"F{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(F2,ROW(F2:F{ultima_linha})-ROW(F2),0)),(C2:C{ultima_linha}=D{linha_dependente})+0)'
+    ws[f"G{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(G2,ROW(G2:G{ultima_linha})-ROW(G2),0)),(C2:C{ultima_linha}=D{linha_dependente})+0)'
+    ws[f"H{linha_dependente}"] = f'=SUMPRODUCT(SUBTOTAL(9,OFFSET(H2,ROW(H2:H{ultima_linha})-ROW(H2),0)),(C2:C{ultima_linha}=D{linha_dependente})+0)'
 
     final = BytesIO()
     wb.save(final)
     final.seek(0)
-
     return final
 
 
@@ -493,7 +483,6 @@ with col_process:
                             status_container.error("⚠️ Não foi possível extrair dados desse PDF.")
                         else:
                             progress_bar.empty()
-                            # 2. substitui por mensagem de sucesso
                             status_container.success("✅ Processamento concluído! Prontinho, meu amor 💚")
 
                             # armazena o arquivo Excel + resumo
@@ -510,10 +499,9 @@ with col_process:
                                 "colaboradores": resumo["colaboradores"][0]
                             })
 
-                            # 3. recarrega após 7s para fazer a mensagem de sucesso sumir
-                            import time
-                            time.sleep(7)
+                            # ✅ CORRIGIDO: sem sleep, só rerun direto
                             st.rerun()
+
 
                     except Exception as e:
                         progress_bar.empty()
