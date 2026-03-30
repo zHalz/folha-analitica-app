@@ -257,7 +257,9 @@ def gerar_planilhas(df_consolidado):
         "454": "Assistência Odontológica Titular",
         "458": "Coparticipação",
         "456": "Assistência Médica Dependente",
-        "461": "Assistência Odontológica Dependente"
+        "461": "Assistência Odontológica Dependente",
+        "694": "694",
+        "696": "696"
     }
 
     codigos = list(mapa_codigos.keys())
